@@ -7,7 +7,7 @@
 -- ============================================================================
 
 CREATE TABLE accounting_exports (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 
   -- Export metadata
@@ -56,7 +56,7 @@ CREATE TABLE accounting_exports (
 -- ============================================================================
 
 CREATE TABLE accounting_export_lines (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   export_id UUID NOT NULL REFERENCES accounting_exports(id) ON DELETE CASCADE,
 

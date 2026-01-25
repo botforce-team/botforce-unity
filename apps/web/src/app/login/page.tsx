@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,59 +57,99 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            BOTFORCE Unity
-          </CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 px-4">
+      <div className="w-full max-w-md">
+        {/* Logo and Branding */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Image
+              src="/logo.png"
+              alt="BOTFORCE"
+              width={56}
+              height={56}
+              className="h-14 w-auto"
+            />
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold text-gray-900 tracking-tight">BOTFORCE</span>
+              <span className="text-sm font-semibold text-primary uppercase tracking-widest">Unity</span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            {error && (
-              <p className="text-sm text-red-600">{error}</p>
-            )}
-            <div className="flex flex-col gap-2">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Loading...' : 'Sign In'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleSignUp}
-                disabled={loading}
-              >
-                Sign Up
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">Business Management Platform</p>
+        </div>
+
+        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-xl font-semibold text-center text-gray-900">
+              Welcome back
+            </CardTitle>
+            <CardDescription className="text-center">
+              Sign in to access your workspace
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="h-11 bg-white border-gray-200 focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-11 bg-white border-gray-200 focus:border-primary focus:ring-primary"
+                />
+              </div>
+              {error && (
+                <div className={`text-sm p-3 rounded-md ${error.includes('Check your email') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                  {error}
+                </div>
+              )}
+              <div className="flex flex-col gap-3 pt-2">
+                <Button
+                  type="submit"
+                  className="w-full h-11 font-medium shadow-sm"
+                  disabled={loading}
+                >
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-200" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-gray-500">or</span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 font-medium border-gray-200 hover:bg-gray-50"
+                  onClick={handleSignUp}
+                  disabled={loading}
+                >
+                  Create an account
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-xs text-gray-500 mt-6">
+          BOTFORCE GmbH · Vienna, Austria
+        </p>
+      </div>
     </div>
   )
 }

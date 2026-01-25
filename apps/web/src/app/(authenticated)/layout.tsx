@@ -37,16 +37,16 @@ export default async function AuthenticatedLayout({
   const currentRole = currentMembership?.role
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Sidebar role={currentRole} />
-      <div className="lg:pl-64">
+      <div className="lg:pl-72">
         <Header
           user={user}
           profile={profile}
           company={currentCompany}
           role={currentRole}
         />
-        <main className="p-4 lg:p-8">
+        <main className="p-6 lg:p-8">
           {children}
         </main>
       </div>

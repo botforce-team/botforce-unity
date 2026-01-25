@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -38,44 +39,60 @@ export function Sidebar({ role }: SidebarProps) {
   )
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
-        <div className="flex h-16 shrink-0 items-center">
-          <span className="text-xl font-bold text-gray-900">BOTFORCE Unity</span>
+    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+      <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white">
+        {/* Logo Section */}
+        <div className="flex h-20 shrink-0 items-center px-6 border-b border-gray-100">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <Image
+              src="/logo.png"
+              alt="BOTFORCE"
+              width={40}
+              height={40}
+              className="h-10 w-auto"
+            />
+            <div className="flex flex-col">
+              <span className="text-lg font-bold text-gray-900 tracking-tight">BOTFORCE</span>
+              <span className="text-xs font-medium text-primary uppercase tracking-wider">Unity</span>
+            </div>
+          </Link>
         </div>
-        <nav className="flex flex-1 flex-col">
-          <ul role="list" className="flex flex-1 flex-col gap-y-7">
-            <li>
-              <ul role="list" className="-mx-2 space-y-1">
-                {filteredNav.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  return (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          isActive
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900',
-                          'group flex gap-x-3 rounded-md p-2 text-sm font-medium leading-6'
-                        )}
-                      >
-                        <item.icon
-                          className={cn(
-                            isActive
-                              ? 'text-gray-900'
-                              : 'text-gray-400 group-hover:text-gray-900',
-                            'h-5 w-5 shrink-0'
-                          )}
-                        />
-                        {item.name}
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            </li>
+
+        {/* Navigation */}
+        <nav className="flex flex-1 flex-col px-4">
+          <ul role="list" className="flex flex-1 flex-col gap-y-1">
+            {filteredNav.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              return (
+                <li key={item.name}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'nav-item',
+                      isActive
+                        ? 'nav-item-active'
+                        : 'nav-item-inactive'
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        'h-5 w-5 shrink-0',
+                        isActive ? 'text-primary-foreground' : 'text-gray-400'
+                      )}
+                    />
+                    {item.name}
+                  </Link>
+                </li>
+              )
+            })}
           </ul>
+
+          {/* Footer */}
+          <div className="py-4 border-t border-gray-100 mt-auto">
+            <p className="text-xs text-gray-400 text-center">
+              &copy; {new Date().getFullYear()} BOTFORCE GmbH
+            </p>
+          </div>
         </nav>
       </div>
     </div>

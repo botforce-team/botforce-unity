@@ -7,7 +7,7 @@
 -- ============================================================================
 
 CREATE TABLE document_number_series (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 
   -- Series configuration
@@ -34,7 +34,7 @@ CREATE TABLE document_number_series (
 -- ============================================================================
 
 CREATE TABLE documents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
 
@@ -100,7 +100,7 @@ CREATE TABLE documents (
 -- ============================================================================
 
 CREATE TABLE document_lines (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
 

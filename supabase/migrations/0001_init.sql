@@ -3,10 +3,9 @@
 -- BOTFORCE Unity
 
 -- ============================================================================
--- EXTENSIONS
+-- EXTENSIONS (pgcrypto provides gen_random_uuid() which works reliably in Supabase)
 -- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================================
@@ -50,7 +49,7 @@ CREATE TYPE audit_action AS ENUM (
 
 -- Companies (tenants)
 CREATE TABLE companies (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   legal_name VARCHAR(255),
   vat_number VARCHAR(50),
@@ -84,7 +83,7 @@ CREATE TABLE profiles (
 
 -- Company members (user-company-role junction)
 CREATE TABLE company_members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   role user_role NOT NULL DEFAULT 'employee',

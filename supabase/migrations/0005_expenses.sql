@@ -7,7 +7,7 @@
 -- ============================================================================
 
 CREATE TABLE files (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 
   -- Storage
@@ -35,7 +35,7 @@ CREATE TABLE files (
 -- ============================================================================
 
 CREATE TABLE expenses (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 
   -- Who submitted
