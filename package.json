@@ -1,0 +1,30 @@
+{
+  "name": "botforce-unity",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BOTFORCE Unity - Invoicing, Time Tracking & Accounting Prep",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm --filter web lint",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop"
+  },
+  "keywords": [
+    "invoicing",
+    "time-tracking",
+    "accounting",
+    "supabase",
+    "nextjs"
+  ],
+  "author": "BOTFORCE GmbH",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@8.15.0",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
