@@ -1,7 +1,41 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Clock, FileText, Receipt, FolderKanban } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+}: {
+  title: string
+  value: string | number
+  subtitle: string
+  icon: typeof Clock
+}) {
+  return (
+    <div
+      className="p-4 rounded-[16px]"
+      style={{
+        background: 'rgba(255, 255, 255, 0.08)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+      }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wider">
+          {title}
+        </span>
+        <Icon className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
+      </div>
+      <div className="text-[24px] font-extrabold text-white tracking-tight">
+        {value}
+      </div>
+      <p className="text-[11px] text-[rgba(232,236,255,0.5)] mt-1">
+        {subtitle}
+      </p>
+    </div>
+  )
+}
 
 export default async function DashboardPage() {
   const supabase = createClient()
@@ -19,9 +53,15 @@ export default async function DashboardPage() {
 
   if (!membership) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-gray-900">No Company Access</h2>
-        <p className="mt-2 text-gray-600">You are not assigned to any company yet.</p>
+      <div
+        className="text-center py-12 rounded-[18px]"
+        style={{
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        <h2 className="text-xl font-semibold text-white">No Company Access</h2>
+        <p className="mt-2 text-[rgba(232,236,255,0.68)]">You are not assigned to any company yet.</p>
       </div>
     )
   }
@@ -114,8 +154,8 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        <p className="mt-1 text-[13px] text-[rgba(232,236,255,0.68)]">
           Welcome back! Here's an overview of your activity.
         </p>
       </div>
@@ -123,104 +163,56 @@ export default async function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {!isAccountant && (
           <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Hours This Month
-                </CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalHoursThisMonth.toFixed(1)}</div>
-                <p className="text-xs text-muted-foreground">
-                  Total logged hours
-                </p>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title="Hours This Month"
+              value={totalHoursThisMonth.toFixed(1)}
+              subtitle="Total logged hours"
+              icon={Clock}
+            />
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {isAdmin ? 'Pending Approvals' : 'Pending Submissions'}
-                </CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{pendingTimeEntries}</div>
-                <p className="text-xs text-muted-foreground">
-                  Time entries to review
-                </p>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title={isAdmin ? 'Pending Approvals' : 'Pending Submissions'}
+              value={pendingTimeEntries}
+              subtitle="Time entries to review"
+              icon={Clock}
+            />
           </>
         )}
 
         {(isAdmin || isAccountant) && (
           <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Unpaid Invoices
-                </CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{unpaidInvoices}</div>
-                <p className="text-xs text-muted-foreground">
-                  Awaiting payment
-                </p>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title="Unpaid Invoices"
+              value={unpaidInvoices}
+              subtitle="Awaiting payment"
+              icon={FileText}
+            />
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Revenue
-                </CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-                <p className="text-xs text-muted-foreground">
-                  From paid invoices
-                </p>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title="Total Revenue"
+              value={formatCurrency(totalRevenue)}
+              subtitle="From paid invoices"
+              icon={FileText}
+            />
           </>
         )}
 
         {!isAccountant && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {isAdmin ? 'Active Projects' : 'Assigned Projects'}
-              </CardTitle>
-              <FolderKanban className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectCount}</div>
-              <p className="text-xs text-muted-foreground">
-                {isAdmin ? 'Currently active' : 'You have access to'}
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title={isAdmin ? 'Active Projects' : 'Assigned Projects'}
+            value={projectCount}
+            subtitle={isAdmin ? 'Currently active' : 'You have access to'}
+            icon={FolderKanban}
+          />
         )}
 
         {isAdmin && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Pending Expenses
-              </CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pendingExpenses}</div>
-              <p className="text-xs text-muted-foreground">
-                Awaiting approval
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Pending Expenses"
+            value={pendingExpenses}
+            subtitle="Awaiting approval"
+            icon={Receipt}
+          />
         )}
       </div>
     </div>

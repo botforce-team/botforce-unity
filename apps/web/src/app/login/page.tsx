@@ -4,10 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -57,96 +53,172 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 px-4">
-      <div className="w-full max-w-md">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{
+        background: `
+          radial-gradient(1200px 700px at 50% 0%, rgba(31, 91, 255, 0.16), transparent 60%),
+          #0b1020
+        `,
+      }}
+    >
+      <div className="w-full max-w-sm">
         {/* Logo and Branding */}
         <div className="flex flex-col items-center mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Image
               src="/logo.png"
               alt="BOTFORCE"
-              width={56}
-              height={56}
-              className="h-14 w-auto"
+              width={48}
+              height={48}
+              className="h-12 w-auto"
             />
             <div className="flex flex-col">
-              <span className="text-2xl font-bold text-white tracking-tight">BOTFORCE</span>
-              <span className="text-sm font-semibold text-blue-400 uppercase tracking-widest">Unity</span>
+              <span className="text-xl font-bold text-white tracking-wide">BOTFORCE</span>
+              <span className="text-[10px] font-medium text-[rgba(255,255,255,0.5)] uppercase tracking-widest">Unity</span>
             </div>
           </div>
-          <p className="text-sm text-slate-400 mt-2">Business Management Platform</p>
+          <p className="text-[13px] text-[rgba(232,236,255,0.68)] mt-2">Business Management Platform</p>
         </div>
 
-        <Card className="shadow-2xl border-0 bg-white">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-semibold text-center text-gray-900">
-              Welcome back
-            </CardTitle>
-            <CardDescription className="text-center">
-              Sign in to access your workspace
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-11 bg-white border-gray-200 focus:border-primary focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-11 bg-white border-gray-200 focus:border-primary focus:ring-primary"
-                />
-              </div>
-              {error && (
-                <div className={`text-sm p-3 rounded-md ${error.includes('Check your email') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                  {error}
-                </div>
-              )}
-              <div className="flex flex-col gap-3 pt-2">
-                <Button
-                  type="submit"
-                  className="w-full h-11 font-medium shadow-sm"
-                  disabled={loading}
-                >
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </Button>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-200" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-gray-500">or</span>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-11 font-medium border-gray-200 hover:bg-gray-50"
-                  onClick={handleSignUp}
-                  disabled={loading}
-                >
-                  Create an account
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        {/* Login Card */}
+        <div
+          className="p-6 rounded-[18px]"
+          style={{
+            background: 'rgba(255, 255, 255, 0.04)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+          }}
+        >
+          <h2 className="text-lg font-semibold text-white text-center mb-1">Welcome back</h2>
+          <p className="text-[13px] text-[rgba(232,236,255,0.68)] text-center mb-6">Sign in to access your workspace</p>
 
-        <p className="text-center text-xs text-slate-500 mt-6">
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none transition-all"
+                style={{
+                  background: 'rgba(0, 0, 0, 0.25)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#1f5bff'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(31, 91, 255, 0.18)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none transition-all"
+                style={{
+                  background: 'rgba(0, 0, 0, 0.25)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#1f5bff'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(31, 91, 255, 0.18)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+
+            {error && (
+              <div
+                className="text-[13px] p-3 rounded-[10px]"
+                style={{
+                  background: error.includes('Check your email')
+                    ? 'rgba(34, 197, 94, 0.12)'
+                    : 'rgba(239, 68, 68, 0.12)',
+                  border: `1px solid ${error.includes('Check your email')
+                    ? 'rgba(34, 197, 94, 0.35)'
+                    : 'rgba(239, 68, 68, 0.35)'}`,
+                  color: error.includes('Check your email') ? '#4ade80' : '#f87171',
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 rounded-[12px] text-[13px] font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: '#1f5bff',
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.background = '#3d72ff'
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#1f5bff'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+
+              <div className="relative flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }} />
+                </div>
+                <span className="relative px-3 text-[11px] uppercase text-[rgba(255,255,255,0.4)]" style={{ background: 'transparent' }}>
+                  or
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSignUp}
+                disabled={loading}
+                className="w-full py-2.5 rounded-[12px] text-[13px] font-medium text-[rgba(255,255,255,0.8)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                }}
+              >
+                Create an account
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <p className="text-center text-[11px] text-[rgba(255,255,255,0.4)] mt-6">
           BOTFORCE GmbH · Vienna, Austria
         </p>
       </div>

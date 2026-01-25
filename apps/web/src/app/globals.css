@@ -2,97 +2,193 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    /* Corporate color scheme - Professional slate/blue */
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    /* Primary: Corporate dark blue */
-    --primary: 217 91% 30%;
-    --primary-foreground: 210 40% 98%;
-    /* Secondary: Light gray */
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 222 47% 11%;
-    /* Muted: Subtle gray */
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
-    /* Accent: Subtle blue */
-    --accent: 214 32% 91%;
-    --accent-foreground: 222 47% 11%;
-    /* Destructive: Professional red */
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    /* Borders */
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 30%;
-    --radius: 0.375rem;
-  }
+/* ========= BOTFORCE DISCOVERY DESIGN SYSTEM ========= */
+:root {
+  /* Spacing & Radius */
+  --r: 18px;
+  --r2: 14px;
+  --r-btn: 12px;
+  --r-input: 12px;
+  --r-pill: 999px;
 
-  .dark {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
-  }
+  /* Dark Theme (Default) - matching Discovery */
+  --bg0: #0b1020;
+  --bg1: rgba(255, 255, 255, 0.04);
+  --bg2: rgba(0, 0, 0, 0.25);
+  --bg-overlay: rgba(0, 0, 0, 0.75);
+
+  --line: rgba(255, 255, 255, 0.12);
+  --line-dashed: rgba(255, 255, 255, 0.08);
+
+  --text: #e8ecff;
+  --text-heading: #ffffff;
+  --muted: #b7c0ff;
+  --muted2: rgba(232, 236, 255, 0.68);
+
+  --shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.45);
+
+  --blur: blur(14px);
+
+  /* Accent Colors */
+  --accent: #1f5bff;
+  --accent-hover: #3d72ff;
+  --accent-soft: rgba(31, 91, 255, 0.18);
+  --accent-border: rgba(31, 91, 255, 0.25);
+
+  --accent2: #22c55e;
+  --accent2-soft: rgba(34, 197, 94, 0.12);
+  --accent2-border: rgba(34, 197, 94, 0.35);
+  --accent2-glow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+
+  --warn: #f59e0b;
+  --warn-soft: rgba(245, 158, 11, 0.12);
+  --warn-border: rgba(245, 158, 11, 0.35);
+
+  --bad: #ef4444;
+  --bad-soft: rgba(239, 68, 68, 0.12);
+  --bad-border: rgba(239, 68, 68, 0.35);
+
+  --chip: rgba(255, 255, 255, 0.08);
+  --chip2: rgba(255, 255, 255, 0.12);
+
+  /* Glass Effects */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.15);
+
+  /* Gradients */
+  --gradient-purple: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  --gradient-blue: linear-gradient(135deg, #1f5bff 0%, #3b82f6 100%);
+  --gradient-green: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+
+  /* Transitions */
+  --transition-base: 0.18s ease;
+  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Tailwind CSS Variable mappings */
+  --background: 222 47% 6%;
+  --foreground: 232 100% 96%;
+  --card: 222 47% 8%;
+  --card-foreground: 232 100% 96%;
+  --popover: 222 47% 8%;
+  --popover-foreground: 232 100% 96%;
+  --primary: 223 100% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 223 33% 17%;
+  --secondary-foreground: 232 100% 96%;
+  --muted-tw: 223 33% 17%;
+  --muted-foreground: 226 71% 73%;
+  --accent-tw: 223 33% 17%;
+  --accent-foreground: 232 100% 96%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 223 20% 18%;
+  --input: 223 20% 18%;
+  --ring: 223 100% 56%;
+  --radius: 0.75rem;
 }
 
 @layer base {
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
+  body {
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 700px at 18% -10%, rgba(31, 91, 255, 0.16), transparent 60%),
+      var(--bg0);
+    min-height: 100vh;
+  }
+
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    color: var(--text-heading);
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--bg2);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--chip2);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 
 @layer components {
-  /* Corporate card style */
-  .card-corporate {
-    @apply bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200;
+  /* Glass Card */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r);
+  }
+
+  .glass-card:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--glass-border-hover);
   }
 
   /* Status badges */
   .badge-draft {
-    @apply bg-slate-100 text-slate-700 border-slate-200;
+    background: var(--chip);
+    border: 1px solid var(--line);
+    color: var(--muted);
   }
   .badge-submitted {
-    @apply bg-amber-50 text-amber-700 border-amber-200;
+    background: var(--warn-soft);
+    border: 1px solid var(--warn-border);
+    color: var(--warn);
   }
   .badge-approved {
-    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+    background: var(--accent2-soft);
+    border: 1px solid var(--accent2-border);
+    color: var(--accent2);
   }
   .badge-rejected {
-    @apply bg-red-50 text-red-700 border-red-200;
+    background: var(--bad-soft);
+    border: 1px solid var(--bad-border);
+    color: var(--bad);
   }
   .badge-invoiced {
-    @apply bg-violet-50 text-violet-700 border-violet-200;
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    color: #a78bfa;
   }
   .badge-paid {
-    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+    background: var(--accent2-soft);
+    border: 1px solid var(--accent2-border);
+    color: var(--accent2);
   }
 
   /* Table styles */
@@ -100,26 +196,142 @@
     @apply w-full text-sm;
   }
   .table-corporate thead {
-    @apply border-b border-gray-200;
+    border-bottom: 1px solid var(--line);
   }
   .table-corporate th {
-    @apply text-left font-medium text-gray-500 py-3 px-4;
+    @apply text-left font-semibold py-3 px-4;
+    color: var(--muted2);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
   .table-corporate td {
-    @apply py-3 px-4 border-b border-gray-100;
+    @apply py-3 px-4;
+    border-bottom: 1px solid var(--line-dashed);
+    color: var(--text);
+  }
+  .table-corporate tbody tr {
+    transition: background 0.15s ease;
   }
   .table-corporate tbody tr:hover {
-    @apply bg-gray-50;
+    background: var(--glass-bg-hover);
   }
 
   /* Sidebar navigation */
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-bottom: 4px;
+    color: var(--muted2);
+    text-decoration: none;
   }
+
+  .nav-item:hover {
+    background: rgba(139, 92, 246, 0.1);
+    color: var(--text-heading);
+  }
+
   .nav-item-active {
-    @apply bg-primary text-primary-foreground;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(31, 91, 255, 0.15) 100%);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
   }
+
+  .nav-item-active svg {
+    color: #a78bfa;
+  }
+
   .nav-item-inactive {
-    @apply text-gray-600 hover:bg-gray-100 hover:text-gray-900;
+    color: var(--muted2);
+  }
+
+  .nav-item-inactive:hover {
+    background: rgba(139, 92, 246, 0.1);
+    color: var(--text-heading);
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+    transition: all 0.18s ease;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text);
+  }
+
+  .btn-ghost:hover {
+    background: var(--chip);
+  }
+
+  /* Form inputs for dark theme */
+  .input-dark {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: var(--r-input);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .input-dark:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    outline: none;
+  }
+
+  .input-dark::placeholder {
+    color: var(--muted2);
+    opacity: 0.6;
+  }
+
+  /* Pills/Tags */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: var(--r-pill);
+    background: var(--chip);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted2);
+    white-space: nowrap;
+  }
+
+  /* Metrics/Stats */
+  .metric-card {
+    background: var(--chip);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    color: var(--muted2);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .metric-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-heading);
   }
 }

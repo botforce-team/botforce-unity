@@ -12,6 +12,7 @@ import {
   Download,
   Settings,
   Users,
+  HelpCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UserRole } from '@/types/database'
@@ -39,27 +40,39 @@ export function Sidebar({ role }: SidebarProps) {
   )
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-      <div className="flex grow flex-col overflow-y-auto border-r border-gray-200 bg-white">
-        {/* Logo Section - Dark background for white logo */}
-        <div className="flex h-20 shrink-0 items-center px-6 bg-slate-900">
+    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-[220px] lg:flex-col">
+      {/* Glass sidebar */}
+      <div
+        className="flex grow flex-col overflow-y-auto"
+        style={{
+          background: 'rgba(15, 23, 42, 0.8)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        {/* Logo Section */}
+        <div
+          className="flex h-16 shrink-0 items-center px-4"
+          style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
+        >
           <Link href="/dashboard" className="flex items-center gap-3">
             <Image
               src="/logo.png"
               alt="BOTFORCE"
-              width={40}
-              height={40}
-              className="h-10 w-auto"
+              width={36}
+              height={36}
+              className="h-9 w-auto"
             />
             <div className="flex flex-col">
-              <span className="text-lg font-bold text-white tracking-tight">BOTFORCE</span>
-              <span className="text-xs font-medium text-blue-400 uppercase tracking-wider">Unity</span>
+              <span className="text-[13px] font-bold text-white tracking-wide">BOTFORCE</span>
+              <span className="text-[9px] font-medium text-[rgba(255,255,255,0.5)] uppercase tracking-widest">Unity</span>
             </div>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col px-4 pt-5">
+        <nav className="flex flex-1 flex-col p-3">
           <ul role="list" className="flex flex-1 flex-col gap-y-1">
             {filteredNav.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
@@ -68,16 +81,30 @@ export function Sidebar({ role }: SidebarProps) {
                   <Link
                     href={item.href}
                     className={cn(
-                      'nav-item',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[14px] font-medium transition-all duration-200',
                       isActive
-                        ? 'nav-item-active'
-                        : 'nav-item-inactive'
+                        ? 'text-[#a78bfa]'
+                        : 'text-[rgba(255,255,255,0.6)] hover:text-white'
                     )}
+                    style={isActive ? {
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(31, 91, 255, 0.15) 100%)',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                    } : {}}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'transparent'
+                      }
+                    }}
                   >
                     <item.icon
                       className={cn(
-                        'h-5 w-5 shrink-0',
-                        isActive ? 'text-primary-foreground' : 'text-gray-400'
+                        'h-5 w-5 shrink-0 opacity-70',
+                        isActive && 'opacity-100'
                       )}
                     />
                     {item.name}
@@ -88,8 +115,18 @@ export function Sidebar({ role }: SidebarProps) {
           </ul>
 
           {/* Footer */}
-          <div className="py-4 border-t border-gray-100 mt-auto">
-            <p className="text-xs text-gray-400 text-center">
+          <div
+            className="py-3 mt-auto"
+            style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+          >
+            <button
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-[13px] text-[rgba(255,255,255,0.6)] hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+              style={{ border: '1px solid rgba(255, 255, 255, 0.08)' }}
+            >
+              <HelpCircle className="h-4 w-4" />
+              Help & Support
+            </button>
+            <p className="text-[10px] text-[rgba(255,255,255,0.4)] text-center mt-3">
               &copy; {new Date().getFullYear()} BOTFORCE GmbH
             </p>
           </div>

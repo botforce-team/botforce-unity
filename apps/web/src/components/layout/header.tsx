@@ -2,8 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { LogOut, Menu, Bell, Search } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import type { Profile, Company, UserRole } from '@/types'
@@ -34,87 +32,137 @@ export function Header({ user, profile, company, role }: HeaderProps) {
     : user.email?.[0]?.toUpperCase() || 'U'
 
   const roleLabels: Record<UserRole, string> = {
-    superadmin: 'Administrator',
+    superadmin: 'Admin',
     employee: 'Employee',
     accountant: 'Accountant',
   }
 
-  const roleBadgeColors: Record<UserRole, string> = {
-    superadmin: 'bg-violet-100 text-violet-700 border-violet-200',
-    employee: 'bg-blue-100 text-blue-700 border-blue-200',
-    accountant: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  const roleBadgeStyles: Record<UserRole, { bg: string; border: string; color: string }> = {
+    superadmin: {
+      bg: 'rgba(139, 92, 246, 0.15)',
+      border: 'rgba(139, 92, 246, 0.35)',
+      color: '#a78bfa'
+    },
+    employee: {
+      bg: 'rgba(31, 91, 255, 0.15)',
+      border: 'rgba(31, 91, 255, 0.35)',
+      color: '#60a5fa'
+    },
+    accountant: {
+      bg: 'rgba(34, 197, 94, 0.15)',
+      border: 'rgba(34, 197, 94, 0.35)',
+      color: '#4ade80'
+    },
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 sm:gap-x-6 sm:px-6 lg:px-8">
+    <header
+      className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-x-4 px-4 sm:gap-x-6 sm:px-5"
+      style={{
+        background: 'rgba(15, 23, 42, 0.6)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+      }}
+    >
       {/* Mobile menu button */}
       <button
         type="button"
-        className="-m-2.5 p-2.5 text-gray-500 hover:text-gray-700 lg:hidden"
+        className="-m-2.5 p-2.5 text-[rgba(255,255,255,0.6)] hover:text-white lg:hidden"
       >
-        <Menu className="h-6 w-6" />
+        <Menu className="h-5 w-5" />
       </button>
 
       {/* Separator */}
-      <div className="h-6 w-px bg-gray-200 lg:hidden" />
+      <div className="h-5 w-px bg-[rgba(255,255,255,0.08)] lg:hidden" />
 
       <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-        {/* Search (placeholder) */}
-        <div className="relative flex flex-1 items-center">
-          <Search className="pointer-events-none absolute left-0 h-5 w-5 text-gray-400" />
-          <input
-            type="search"
-            placeholder="Search..."
-            className="h-full w-full border-0 bg-transparent py-0 pl-8 pr-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm"
-          />
+        {/* Search */}
+        <div className="relative flex flex-1 items-center max-w-md">
+          <div
+            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg"
+            style={{
+              background: 'rgba(0, 0, 0, 0.25)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}
+          >
+            <Search className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
+            <input
+              type="search"
+              placeholder="Search..."
+              className="w-full bg-transparent border-0 text-[13px] text-[#e8ecff] placeholder:text-[rgba(255,255,255,0.4)] focus:outline-none focus:ring-0"
+            />
+          </div>
         </div>
 
         {/* Right section */}
-        <div className="flex items-center gap-x-4 lg:gap-x-6">
+        <div className="flex items-center gap-x-3 lg:gap-x-4">
           {/* Notifications */}
           <button
             type="button"
-            className="relative p-2 text-gray-400 hover:text-gray-500"
+            className="relative p-2 text-[rgba(255,255,255,0.6)] hover:text-white transition-colors rounded-lg hover:bg-[rgba(255,255,255,0.05)]"
           >
             <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
+            <span
+              className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full"
+              style={{ background: '#1f5bff', boxShadow: '0 0 6px rgba(31, 91, 255, 0.5)' }}
+            />
           </button>
 
           {/* Separator */}
-          <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200" />
+          <div className="hidden lg:block lg:h-5 lg:w-px" style={{ background: 'rgba(255, 255, 255, 0.08)' }} />
 
           {/* User profile */}
           <div className="flex items-center gap-x-3">
-            <div className="hidden lg:flex lg:flex-col lg:items-end">
-              <span className="text-sm font-medium text-gray-900">{displayName}</span>
-              <span className="text-xs text-gray-500">{company?.name}</span>
+            {/* Avatar */}
+            <div
+              className="h-8 w-8 rounded-full flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #1f5bff 100%)',
+              }}
+            >
+              <span className="text-[12px] font-semibold text-white">{initials}</span>
             </div>
 
-            {/* Avatar */}
-            <div className="flex items-center gap-x-3">
-              <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-sm font-medium text-primary-foreground">{initials}</span>
-              </div>
+            <div className="hidden lg:flex lg:flex-col lg:items-start">
+              <span className="text-[13px] font-medium text-white">{displayName}</span>
+              <span className="text-[11px] text-[rgba(255,255,255,0.5)]">{company?.name}</span>
             </div>
 
             {/* Role badge */}
             {role && (
-              <Badge className={`hidden sm:inline-flex ${roleBadgeColors[role]} border`}>
+              <span
+                className="hidden sm:inline-flex px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wide"
+                style={{
+                  background: roleBadgeStyles[role].bg,
+                  border: `1px solid ${roleBadgeStyles[role].border}`,
+                  color: roleBadgeStyles[role].color,
+                }}
+              >
                 {roleLabels[role]}
-              </Badge>
+              </span>
             )}
           </div>
 
           {/* Logout */}
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={handleLogout}
-            className="text-gray-500 hover:text-gray-700"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-[rgba(255,255,255,0.6)] hover:text-white transition-all"
+            style={{
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+            }}
           >
-            <LogOut className="h-4 w-4 mr-2" />
+            <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">Sign out</span>
-          </Button>
+          </button>
         </div>
       </div>
     </header>
