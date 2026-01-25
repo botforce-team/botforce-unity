@@ -1,9 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
 import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 export default async function ProjectsPage() {
@@ -23,7 +20,7 @@ export default async function ProjectsPage() {
   if (!membership) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">No company access.</p>
+        <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
       </div>
     )
   }
@@ -66,77 +63,92 @@ export default async function ProjectsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-white">Projects</h1>
+          <p className="mt-1 text-[13px] text-[rgba(232,236,255,0.68)]">
             {isAdmin ? 'Manage all projects' : 'Your assigned projects'}
           </p>
         </div>
         {isAdmin && (
-          <Link href="/projects/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Button>
+          <Link
+            href="/projects/new"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-[13px] font-semibold text-white"
+            style={{ background: '#1f5bff' }}
+          >
+            <Plus className="h-4 w-4" />
+            New Project
           </Link>
         )}
       </div>
 
       {projects.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-600">
-              {isAdmin
-                ? 'No projects yet. Create your first project to get started.'
-                : 'No projects assigned to you yet.'}
-            </p>
-          </CardContent>
-        </Card>
+        <div
+          className="py-12 rounded-[18px] text-center"
+          style={{
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+          }}
+        >
+          <p className="text-[rgba(232,236,255,0.6)]">
+            {isAdmin
+              ? 'No projects yet. Create your first project to get started.'
+              : 'No projects assigned to you yet.'}
+          </p>
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {project.customer?.name}
-                      </p>
-                    </div>
-                    <Badge variant={project.is_active ? 'default' : 'secondary'}>
-                      {project.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {project.code && (
-                    <p className="text-sm text-gray-500 mb-2">
-                      Code: {project.code}
+              <div
+                className="p-5 rounded-[18px] h-full transition-all hover:border-[rgba(255,255,255,0.2)]"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                }}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white">{project.name}</h3>
+                    <p className="text-[12px] text-[rgba(232,236,255,0.5)]">
+                      {project.customer?.name}
                     </p>
-                  )}
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">
-                      {project.billing_type === 'hourly' ? 'Hourly' : 'Fixed Price'}
+                  </div>
+                  <span
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
+                    style={{
+                      background: project.is_active ? 'rgba(34, 197, 94, 0.12)' : 'rgba(255, 255, 255, 0.08)',
+                      border: `1px solid ${project.is_active ? 'rgba(34, 197, 94, 0.35)' : 'rgba(255, 255, 255, 0.12)'}`,
+                      color: project.is_active ? '#22c55e' : 'rgba(255, 255, 255, 0.5)',
+                    }}
+                  >
+                    {project.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                {project.code && (
+                  <p className="text-[12px] text-[rgba(232,236,255,0.5)] mb-3">
+                    Code: {project.code}
+                  </p>
+                )}
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-[rgba(232,236,255,0.6)]">
+                    {project.billing_type === 'hourly' ? 'Hourly' : 'Fixed Price'}
+                  </span>
+                  {project.billing_type === 'hourly' && project.hourly_rate && (
+                    <span className="font-semibold text-white">
+                      {formatCurrency(project.hourly_rate)}/hr
                     </span>
-                    {project.billing_type === 'hourly' && project.hourly_rate && (
-                      <span className="font-medium">
-                        {formatCurrency(project.hourly_rate)}/hr
-                      </span>
-                    )}
-                    {project.billing_type === 'fixed' && project.fixed_price && (
-                      <span className="font-medium">
-                        {formatCurrency(project.fixed_price)}
-                      </span>
-                    )}
-                  </div>
-                  {project.budget_hours && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Budget: {project.budget_hours}h
-                    </p>
                   )}
-                </CardContent>
-              </Card>
+                  {project.billing_type === 'fixed' && project.fixed_price && (
+                    <span className="font-semibold text-white">
+                      {formatCurrency(project.fixed_price)}
+                    </span>
+                  )}
+                </div>
+                {project.budget_hours && (
+                  <p className="text-[11px] text-[rgba(232,236,255,0.5)] mt-2">
+                    Budget: {project.budget_hours}h
+                  </p>
+                )}
+              </div>
             </Link>
           ))}
         </div>

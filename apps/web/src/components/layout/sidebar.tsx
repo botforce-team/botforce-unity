@@ -12,7 +12,9 @@ import {
   Download,
   Settings,
   Users,
+  Building2,
   HelpCircle,
+  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UserRole } from '@/types/database'
@@ -23,10 +25,12 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['superadmin', 'employee', 'accountant'] },
+  { name: 'Customers', href: '/customers', icon: Building2, roles: ['superadmin'] },
   { name: 'Projects', href: '/projects', icon: FolderKanban, roles: ['superadmin', 'employee'] },
   { name: 'Timesheets', href: '/timesheets', icon: Clock, roles: ['superadmin', 'employee'] },
   { name: 'Documents', href: '/documents', icon: FileText, roles: ['superadmin', 'accountant'] },
   { name: 'Expenses', href: '/expenses', icon: Receipt, roles: ['superadmin', 'employee', 'accountant'] },
+  { name: 'Finance', href: '/finance', icon: TrendingUp, roles: ['superadmin', 'accountant'] },
   { name: 'Accounting Export', href: '/accounting-export', icon: Download, roles: ['superadmin', 'accountant'] },
   { name: 'Team', href: '/team', icon: Users, roles: ['superadmin'] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['superadmin'] },

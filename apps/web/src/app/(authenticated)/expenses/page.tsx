@@ -1,10 +1,49 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Plus, Receipt, Upload } from 'lucide-react'
 import Link from 'next/link'
-import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
+import { SubmitExpenseButton, ApproveExpenseButton, RejectExpenseButton, DeleteExpenseButton } from './expense-actions'
+
+function getStatusStyle(status: string) {
+  switch (status) {
+    case 'approved':
+      return {
+        background: 'rgba(34, 197, 94, 0.12)',
+        border: '1px solid rgba(34, 197, 94, 0.35)',
+        color: '#22c55e',
+      }
+    case 'submitted':
+      return {
+        background: 'rgba(245, 158, 11, 0.12)',
+        border: '1px solid rgba(245, 158, 11, 0.35)',
+        color: '#f59e0b',
+      }
+    case 'draft':
+      return {
+        background: 'rgba(255, 255, 255, 0.08)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        color: 'rgba(255, 255, 255, 0.5)',
+      }
+    case 'rejected':
+      return {
+        background: 'rgba(239, 68, 68, 0.12)',
+        border: '1px solid rgba(239, 68, 68, 0.35)',
+        color: '#ef4444',
+      }
+    case 'reimbursed':
+      return {
+        background: 'rgba(59, 130, 246, 0.12)',
+        border: '1px solid rgba(59, 130, 246, 0.35)',
+        color: '#3b82f6',
+      }
+    default:
+      return {
+        background: 'rgba(255, 255, 255, 0.08)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        color: 'rgba(255, 255, 255, 0.5)',
+      }
+  }
+}
 
 export default async function ExpensesPage() {
   const supabase = createClient()
@@ -23,7 +62,7 @@ export default async function ExpensesPage() {
   if (!membership) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">No company access.</p>
+        <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
       </div>
     )
   }
@@ -33,11 +72,12 @@ export default async function ExpensesPage() {
   const isAccountant = role === 'accountant'
 
   // Fetch expenses based on role
+  // Use explicit foreign key hint for profile join since there are multiple FKs to profiles
   let expensesQuery = supabase
     .from('expenses')
     .select(`
       *,
-      profile:profiles(id, email, first_name, last_name),
+      profile:profiles!expenses_user_id_fkey(id, email, first_name, last_name),
       project:projects(id, name, code)
     `)
     .eq('company_id', company_id)
@@ -62,61 +102,62 @@ export default async function ExpensesPage() {
 
   const canCreateExpense = !isAccountant
 
+  const cardStyle = {
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-white">Expenses</h1>
+          <p className="mt-1 text-[13px] text-[rgba(232,236,255,0.68)]">
             {isAdmin ? 'Review and approve expenses' :
              isAccountant ? 'View all expenses' :
              'Submit and track your expenses'}
           </p>
         </div>
         {canCreateExpense && (
-          <Link href="/expenses/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Expense
-            </Button>
+          <Link
+            href="/expenses/new"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-[13px] font-semibold text-white"
+            style={{ background: '#1f5bff' }}
+          >
+            <Plus className="h-4 w-4" />
+            New Expense
           </Link>
         )}
       </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
-            <p className="text-sm text-muted-foreground">Total Expenses</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-yellow-600">
-              {formatCurrency(pendingAmount)}
-            </div>
-            <p className="text-sm text-muted-foreground">Pending Approval</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(approvedAmount)}
-            </div>
-            <p className="text-sm text-muted-foreground">Approved</p>
-          </CardContent>
-        </Card>
+        <div className="p-5 rounded-[18px]" style={cardStyle}>
+          <div className="text-2xl font-bold text-white">{formatCurrency(totalAmount)}</div>
+          <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Total Expenses</p>
+        </div>
+        <div className="p-5 rounded-[18px]" style={cardStyle}>
+          <div className="text-2xl font-bold text-[#f59e0b]">
+            {formatCurrency(pendingAmount)}
+          </div>
+          <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Pending Approval</p>
+        </div>
+        <div className="p-5 rounded-[18px]" style={cardStyle}>
+          <div className="text-2xl font-bold text-[#22c55e]">
+            {formatCurrency(approvedAmount)}
+          </div>
+          <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Approved</p>
+        </div>
       </div>
 
       {/* Expenses List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Expenses</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-[18px] overflow-hidden" style={cardStyle}>
+        <div className="p-5 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+          <h2 className="text-[15px] font-semibold text-white">All Expenses</h2>
+        </div>
+        <div className="p-5">
           {!expenses || expenses.length === 0 ? (
-            <p className="text-center text-gray-600 py-8">
+            <p className="text-center text-[rgba(232,236,255,0.6)] py-8 text-[13px]">
               No expenses yet.
               {canCreateExpense && ' Click "New Expense" to add your first expense.'}
             </p>
@@ -124,77 +165,88 @@ export default async function ExpensesPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b text-left text-sm text-gray-500">
-                    <th className="pb-3 font-medium">Date</th>
-                    <th className="pb-3 font-medium">Category</th>
-                    <th className="pb-3 font-medium">Description</th>
+                  <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide" style={{ borderColor: 'rgba(255, 255, 255, 0.08)', color: 'rgba(232, 236, 255, 0.5)' }}>
+                    <th className="pb-3">Date</th>
+                    <th className="pb-3">Category</th>
+                    <th className="pb-3">Description</th>
                     {(isAdmin || isAccountant) && (
-                      <th className="pb-3 font-medium">Employee</th>
+                      <th className="pb-3">Employee</th>
                     )}
-                    <th className="pb-3 font-medium">Project</th>
-                    <th className="pb-3 font-medium text-right">Amount</th>
-                    <th className="pb-3 font-medium">Status</th>
-                    <th className="pb-3 font-medium">Receipt</th>
-                    <th className="pb-3 font-medium"></th>
+                    <th className="pb-3">Project</th>
+                    <th className="pb-3 text-right">Amount</th>
+                    <th className="pb-3">Status</th>
+                    <th className="pb-3">Receipt</th>
+                    <th className="pb-3"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody>
                   {expenses.map((expense) => (
-                    <tr key={expense.id} className="text-sm">
-                      <td className="py-3">{formatDate(expense.date)}</td>
+                    <tr
+                      key={expense.id}
+                      className="text-[13px] border-b last:border-0"
+                      style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}
+                    >
+                      <td className="py-3 text-[rgba(232,236,255,0.6)]">{formatDate(expense.date)}</td>
                       <td className="py-3">
-                        <Badge variant="outline">{expense.category}</Badge>
+                        <span
+                          className="px-2 py-0.5 rounded text-[10px] font-medium uppercase"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            color: 'rgba(232, 236, 255, 0.7)',
+                          }}
+                        >
+                          {expense.category}
+                        </span>
                       </td>
                       <td className="py-3">
                         <div>
-                          <p className="font-medium">{expense.merchant || '-'}</p>
+                          <p className="font-medium text-white">{expense.merchant || '-'}</p>
                           {expense.description && (
-                            <p className="text-xs text-gray-500 truncate max-w-xs">
+                            <p className="text-[11px] text-[rgba(232,236,255,0.5)] truncate max-w-xs">
                               {expense.description}
                             </p>
                           )}
                         </div>
                       </td>
                       {(isAdmin || isAccountant) && (
-                        <td className="py-3">
+                        <td className="py-3 text-[rgba(232,236,255,0.7)]">
                           {expense.profile?.first_name || expense.profile?.email}
                         </td>
                       )}
-                      <td className="py-3">
+                      <td className="py-3 text-[rgba(232,236,255,0.6)]">
                         {expense.project?.name || '-'}
                       </td>
-                      <td className="py-3 text-right font-medium">
+                      <td className="py-3 text-right font-medium text-white">
                         {formatCurrency(Number(expense.amount))}
                       </td>
                       <td className="py-3">
-                        <Badge className={getStatusColor(expense.status)}>
+                        <span
+                          className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
+                          style={getStatusStyle(expense.status)}
+                        >
                           {expense.status}
-                        </Badge>
+                        </span>
                       </td>
                       <td className="py-3">
                         {expense.receipt_file_id ? (
-                          <Receipt className="h-4 w-4 text-green-600" />
+                          <Receipt className="h-4 w-4 text-[#22c55e]" />
                         ) : (
-                          <Upload className="h-4 w-4 text-gray-300" />
+                          <Upload className="h-4 w-4 text-[rgba(255,255,255,0.2)]" />
                         )}
                       </td>
                       <td className="py-3">
                         <div className="flex justify-end gap-2">
-                          {expense.status === 'draft' && !isAdmin && !isAccountant && (
-                            <Link href={`/expenses/${expense.id}/edit`}>
-                              <Button variant="outline" size="sm">
-                                Edit
-                              </Button>
-                            </Link>
+                          {expense.status === 'draft' && expense.user_id === user.id && (
+                            <>
+                              <SubmitExpenseButton expenseId={expense.id} />
+                              <DeleteExpenseButton expenseId={expense.id} />
+                            </>
                           )}
                           {expense.status === 'submitted' && isAdmin && (
                             <>
-                              <Button variant="outline" size="sm" className="text-green-600">
-                                Approve
-                              </Button>
-                              <Button variant="outline" size="sm" className="text-red-600">
-                                Reject
-                              </Button>
+                              <ApproveExpenseButton expenseId={expense.id} />
+                              <RejectExpenseButton expenseId={expense.id} />
                             </>
                           )}
                         </div>
@@ -205,8 +257,8 @@ export default async function ExpensesPage() {
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

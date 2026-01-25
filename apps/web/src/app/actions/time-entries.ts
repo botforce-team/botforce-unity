@@ -7,9 +7,13 @@ import { z } from 'zod'
 const timeEntrySchema = z.object({
   project_id: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  hours: z.number().min(0.25).max(24),
+  hours: z.number().min(0.01).max(24),
   description: z.string().optional(),
   is_billable: z.boolean().default(true),
+  // Start/End time mode fields
+  start_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  break_minutes: z.number().min(0).max(480).optional(),
 })
 
 export async function createTimeEntry(formData: FormData) {
@@ -33,12 +37,19 @@ export async function createTimeEntry(formData: FormData) {
   }
 
   // Parse and validate input
+  const startTimeVal = formData.get('start_time') as string
+  const endTimeVal = formData.get('end_time') as string
+  const breakMinutesVal = formData.get('break_minutes') as string
+
   const rawData = {
     project_id: formData.get('project_id') as string,
     date: formData.get('date') as string,
     hours: parseFloat(formData.get('hours') as string),
     description: formData.get('description') as string || undefined,
     is_billable: formData.get('is_billable') === 'true',
+    start_time: startTimeVal || undefined,
+    end_time: endTimeVal || undefined,
+    break_minutes: breakMinutesVal ? parseInt(breakMinutesVal) : undefined,
   }
 
   const result = timeEntrySchema.safeParse(rawData)
@@ -46,28 +57,51 @@ export async function createTimeEntry(formData: FormData) {
     return { error: 'Invalid input', details: result.error.flatten() }
   }
 
-  const { project_id, date, hours, description, is_billable } = result.data
+  const { project_id, date, hours, description, is_billable, start_time, end_time, break_minutes } = result.data
 
-  // Create the time entry
-  const { data, error } = await supabase
+  // Build insert data - only include time columns if the migration has been applied
+  const baseInsertData = {
+    company_id: membership.company_id,
+    project_id,
+    user_id: user.id,
+    date,
+    hours,
+    description,
+    is_billable,
+    status: 'draft',
+  }
+
+  // Try insert with all fields first
+  let { data, error } = await supabase
     .from('time_entries')
     .insert({
-      company_id: membership.company_id,
-      project_id,
-      user_id: user.id,
-      date,
-      hours,
-      description,
-      is_billable,
-      status: 'draft',
+      ...baseInsertData,
+      start_time: start_time || null,
+      end_time: end_time || null,
+      break_minutes: break_minutes ?? 0,
     })
     .select()
     .single()
+
+  // If insert fails due to missing columns, retry without the new columns
+  if (error && error.message.includes('column')) {
+    console.warn('Retrying insert without time mode columns:', error.message)
+    const retryResult = await supabase
+      .from('time_entries')
+      .insert(baseInsertData)
+      .select()
+      .single()
+
+    data = retryResult.data
+    error = retryResult.error
+  }
 
   if (error) {
     console.error('Error creating time entry:', error)
     return { error: error.message }
   }
+
+  console.log('Time entry created successfully:', data?.id, 'for company_id:', membership.company_id)
 
   revalidatePath('/timesheets')
   return { data }
@@ -82,12 +116,19 @@ export async function updateTimeEntry(id: string, formData: FormData) {
   }
 
   // Parse and validate input
+  const startTimeVal = formData.get('start_time') as string
+  const endTimeVal = formData.get('end_time') as string
+  const breakMinutesVal = formData.get('break_minutes') as string
+
   const rawData = {
     project_id: formData.get('project_id') as string,
     date: formData.get('date') as string,
     hours: parseFloat(formData.get('hours') as string),
     description: formData.get('description') as string || undefined,
     is_billable: formData.get('is_billable') === 'true',
+    start_time: startTimeVal || undefined,
+    end_time: endTimeVal || undefined,
+    break_minutes: breakMinutesVal ? parseInt(breakMinutesVal) : undefined,
   }
 
   const result = timeEntrySchema.safeParse(rawData)
@@ -95,21 +136,43 @@ export async function updateTimeEntry(id: string, formData: FormData) {
     return { error: 'Invalid input', details: result.error.flatten() }
   }
 
-  const { project_id, date, hours, description, is_billable } = result.data
+  const { project_id, date, hours, description, is_billable, start_time, end_time, break_minutes } = result.data
 
-  // Update the time entry
-  const { data, error } = await supabase
+  // Build update data - only include time columns if the migration has been applied
+  const baseUpdateData = {
+    project_id,
+    date,
+    hours,
+    description,
+    is_billable,
+  }
+
+  // Try update with all fields first
+  let { data, error } = await supabase
     .from('time_entries')
     .update({
-      project_id,
-      date,
-      hours,
-      description,
-      is_billable,
+      ...baseUpdateData,
+      start_time: start_time || null,
+      end_time: end_time || null,
+      break_minutes: break_minutes ?? 0,
     })
     .eq('id', id)
     .select()
     .single()
+
+  // If update fails due to missing columns, retry without the new columns
+  if (error && error.message.includes('column')) {
+    console.warn('Retrying update without time mode columns:', error.message)
+    const retryResult = await supabase
+      .from('time_entries')
+      .update(baseUpdateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    data = retryResult.data
+    error = retryResult.error
+  }
 
   if (error) {
     console.error('Error updating time entry:', error)
