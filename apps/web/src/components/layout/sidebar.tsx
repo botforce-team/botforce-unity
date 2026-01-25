@@ -40,9 +40,9 @@ export function Sidebar({ role }: SidebarProps) {
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white">
-        {/* Logo Section */}
-        <div className="flex h-20 shrink-0 items-center px-6 border-b border-gray-100">
+      <div className="flex grow flex-col overflow-y-auto border-r border-gray-200 bg-white">
+        {/* Logo Section - Dark background for white logo */}
+        <div className="flex h-20 shrink-0 items-center px-6 bg-slate-900">
           <Link href="/dashboard" className="flex items-center gap-3">
             <Image
               src="/logo.png"
@@ -52,14 +52,14 @@ export function Sidebar({ role }: SidebarProps) {
               className="h-10 w-auto"
             />
             <div className="flex flex-col">
-              <span className="text-lg font-bold text-gray-900 tracking-tight">BOTFORCE</span>
-              <span className="text-xs font-medium text-primary uppercase tracking-wider">Unity</span>
+              <span className="text-lg font-bold text-white tracking-tight">BOTFORCE</span>
+              <span className="text-xs font-medium text-blue-400 uppercase tracking-wider">Unity</span>
             </div>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col px-4">
+        <nav className="flex flex-1 flex-col px-4 pt-5">
           <ul role="list" className="flex flex-1 flex-col gap-y-1">
             {filteredNav.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')

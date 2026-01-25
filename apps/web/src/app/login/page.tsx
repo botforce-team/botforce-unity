@@ -57,7 +57,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 px-4">
       <div className="w-full max-w-md">
         {/* Logo and Branding */}
         <div className="flex flex-col items-center mb-8">
@@ -70,14 +70,14 @@ export default function LoginPage() {
               className="h-14 w-auto"
             />
             <div className="flex flex-col">
-              <span className="text-2xl font-bold text-gray-900 tracking-tight">BOTFORCE</span>
-              <span className="text-sm font-semibold text-primary uppercase tracking-widest">Unity</span>
+              <span className="text-2xl font-bold text-white tracking-tight">BOTFORCE</span>
+              <span className="text-sm font-semibold text-blue-400 uppercase tracking-widest">Unity</span>
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-2">Business Management Platform</p>
+          <p className="text-sm text-slate-400 mt-2">Business Management Platform</p>
         </div>
 
-        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+        <Card className="shadow-2xl border-0 bg-white">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl font-semibold text-center text-gray-900">
               Welcome back
@@ -146,7 +146,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-gray-500 mt-6">
+        <p className="text-center text-xs text-slate-500 mt-6">
           BOTFORCE GmbH · Vienna, Austria
         </p>
       </div>
