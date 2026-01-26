@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
 const projectSchema = z.object({
   customer_id: z.string().uuid(),
   name: z.string().min(1).max(255),
@@ -26,12 +31,14 @@ export async function createProject(formData: FormData) {
   }
 
   // Get user's company and verify admin role
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership || membership.role !== 'superadmin') {
     return { error: 'Only admins can create projects' }
@@ -61,7 +68,7 @@ export async function createProject(formData: FormData) {
     .insert({
       company_id: membership.company_id,
       ...result.data,
-    })
+    } as never)
     .select()
     .single()
 
@@ -103,7 +110,7 @@ export async function updateProject(id: string, formData: FormData) {
 
   const { data, error } = await supabase
     .from('projects')
-    .update(result.data)
+    .update(result.data as never)
     .eq('id', id)
     .select()
     .single()
@@ -127,12 +134,14 @@ export async function createCustomer(formData: FormData) {
   }
 
   // Get user's company
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership || membership.role !== 'superadmin') {
     return { error: 'Only admins can create customers' }
@@ -158,7 +167,7 @@ export async function createCustomer(formData: FormData) {
       postal_code: formData.get('postal_code') as string || null,
       country: country,
       reverse_charge: reverseCharge,
-    })
+    } as never)
     .select()
     .single()
 
@@ -180,12 +189,14 @@ export async function updateCustomer(id: string, formData: FormData) {
     return { error: 'Unauthorized' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership || membership.role !== 'superadmin') {
     return { error: 'Only admins can update customers' }
@@ -204,7 +215,7 @@ export async function updateCustomer(id: string, formData: FormData) {
       postal_code: formData.get('postal_code') as string || null,
       country: formData.get('country') as string || 'AT',
       reverse_charge: formData.get('reverse_charge') === 'true',
-    })
+    } as never)
     .eq('id', id)
     .eq('company_id', membership.company_id)
     .select()
@@ -228,12 +239,14 @@ export async function archiveProject(id: string) {
     return { error: 'Unauthorized' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership || membership.role !== 'superadmin') {
     return { error: 'Only admins can archive projects' }
@@ -241,7 +254,7 @@ export async function archiveProject(id: string) {
 
   const { data, error } = await supabase
     .from('projects')
-    .update({ is_active: false })
+    .update({ is_active: false } as never)
     .eq('id', id)
     .eq('company_id', membership.company_id)
     .select()
@@ -265,12 +278,14 @@ export async function deleteProject(id: string) {
     return { error: 'Unauthorized' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership || membership.role !== 'superadmin') {
     return { error: 'Only admins can delete projects' }
@@ -330,12 +345,14 @@ export async function deleteCustomer(id: string) {
     return { error: 'Unauthorized' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership || membership.role !== 'superadmin') {
     return { error: 'Only admins can delete customers' }

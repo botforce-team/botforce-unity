@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
 const timeEntrySchema = z.object({
   project_id: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -25,12 +30,14 @@ export async function createTimeEntry(formData: FormData) {
   }
 
   // Get user's company
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership) {
     return { error: 'No company membership found' }
@@ -302,4 +309,151 @@ export async function deleteTimeEntry(id: string) {
 
   revalidatePath('/timesheets')
   return { success: true }
+}
+
+// Bulk operations
+export async function bulkApproveTimeEntries(ids: string[]) {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Verify admin role
+  const { data: membershipData } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  const membership = membershipData as CompanyMembership | null
+
+  if (!membership || membership.role !== 'superadmin') {
+    return { error: 'Only admins can approve time entries' }
+  }
+
+  let successCount = 0
+  let errorCount = 0
+
+  for (const id of ids) {
+    // Get entry to find project rate
+    const { data: entry } = await supabase
+      .from('time_entries')
+      .select(`
+        *,
+        project:projects(hourly_rate)
+      `)
+      .eq('id', id)
+      .single()
+
+    if (!entry) {
+      errorCount++
+      continue
+    }
+
+    const { error } = await supabase
+      .from('time_entries')
+      .update({
+        status: 'approved',
+        approved_by: user.id,
+        approved_at: new Date().toISOString(),
+        hourly_rate: (entry as any).project?.hourly_rate || null,
+      })
+      .eq('id', id)
+      .eq('company_id', membership.company_id)
+      .eq('status', 'submitted')
+
+    if (error) {
+      errorCount++
+    } else {
+      successCount++
+    }
+  }
+
+  revalidatePath('/timesheets')
+  return { success: true, approved: successCount, errors: errorCount }
+}
+
+export async function bulkRejectTimeEntries(ids: string[], reason: string) {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Verify admin role
+  const { data: membershipData } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  const membership = membershipData as CompanyMembership | null
+
+  if (!membership || membership.role !== 'superadmin') {
+    return { error: 'Only admins can reject time entries' }
+  }
+
+  let successCount = 0
+  let errorCount = 0
+
+  for (const id of ids) {
+    const { error } = await supabase
+      .from('time_entries')
+      .update({
+        status: 'rejected',
+        rejected_by: user.id,
+        rejected_at: new Date().toISOString(),
+        rejection_reason: reason,
+      })
+      .eq('id', id)
+      .eq('company_id', membership.company_id)
+      .in('status', ['submitted', 'approved'])
+
+    if (error) {
+      errorCount++
+    } else {
+      successCount++
+    }
+  }
+
+  revalidatePath('/timesheets')
+  return { success: true, rejected: successCount, errors: errorCount }
+}
+
+export async function bulkSubmitTimeEntries(ids: string[]) {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  let successCount = 0
+  let errorCount = 0
+
+  for (const id of ids) {
+    const { error } = await supabase
+      .from('time_entries')
+      .update({
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('status', 'draft')
+
+    if (error) {
+      errorCount++
+    } else {
+      successCount++
+    }
+  }
+
+  revalidatePath('/timesheets')
+  return { success: true, submitted: successCount, errors: errorCount }
 }

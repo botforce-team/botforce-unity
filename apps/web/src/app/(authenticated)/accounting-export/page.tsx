@@ -22,6 +22,11 @@ interface AccountingExport {
   } | null
 }
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
 function getStatusStyle(status: string) {
   switch (status) {
     case 'completed':
@@ -58,12 +63,14 @@ export default async function AccountingExportPage() {
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership) {
     return (

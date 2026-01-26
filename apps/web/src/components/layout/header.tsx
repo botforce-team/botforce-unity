@@ -2,9 +2,10 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, Menu, Bell, Search } from 'lucide-react'
+import { LogOut, Menu, Bell } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import type { Profile, Company, UserRole } from '@/types'
+import { GlobalSearch } from '@/components/search/global-search'
 
 interface HeaderProps {
   user: User
@@ -79,20 +80,7 @@ export function Header({ user, profile, company, role }: HeaderProps) {
       <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
         {/* Search */}
         <div className="relative flex flex-1 items-center max-w-md">
-          <div
-            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg"
-            style={{
-              background: 'rgba(0, 0, 0, 0.25)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-            }}
-          >
-            <Search className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
-            <input
-              type="search"
-              placeholder="Search..."
-              className="w-full bg-transparent border-0 text-[13px] text-[#e8ecff] placeholder:text-[rgba(255,255,255,0.4)] focus:outline-none focus:ring-0"
-            />
-          </div>
+          <GlobalSearch />
         </div>
 
         {/* Right section */}
