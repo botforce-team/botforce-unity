@@ -1,0 +1,9 @@
+node_modules
+.next
+.vercel
+coverage
+playwright-report
+dist
+build
+*.min.js
+pnpm-lock.yaml

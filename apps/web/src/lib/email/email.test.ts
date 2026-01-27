@@ -4,14 +4,14 @@ import {
   getTeamInviteEmailHtml,
   getApprovalNotificationEmailHtml,
   getPaymentReminderEmailHtml,
-} from './index'
+} from './templates'
 
 describe('getInvoiceEmailHtml', () => {
   it('generates valid HTML with all required fields', () => {
     const html = getInvoiceEmailHtml({
       customerName: 'Acme Corp',
       documentNumber: 'INV-2026-00001',
-      total: 1500.50,
+      total: 1500.5,
       currency: 'EUR',
       dueDate: '15.01.2026',
       companyName: 'BOTFORCE GmbH',

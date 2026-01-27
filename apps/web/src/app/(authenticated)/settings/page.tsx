@@ -1,24 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
 import { CompanyInfoForm, AddressForm, ContactForm } from './settings-forms'
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
 export default async function SettingsPage() {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
+  const membership = membershipData as CompanyMembership | null
+
   if (!membership || membership.role !== 'superadmin') {
     return (
-      <div className="text-center py-12">
-        <p className="text-[rgba(232,236,255,0.6)]">You don't have access to settings.</p>
+      <div className="py-12 text-center">
+        <p className="text-[rgba(232,236,255,0.6)]">You don&apos;t have access to settings.</p>
       </div>
     )
   }
@@ -32,14 +41,14 @@ export default async function SettingsPage() {
 
   if (!company) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-[rgba(232,236,255,0.6)]">Company not found.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
         <p className="mt-1 text-[13px] text-[rgba(232,236,255,0.68)]">

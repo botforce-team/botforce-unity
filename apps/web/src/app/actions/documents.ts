@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import type { Database, DocumentType, DocumentStatus, TaxRate } from '@/types/database'
-import { sendEmail, getInvoiceEmailHtml, getPaymentReminderEmailHtml } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
+import { getInvoiceEmailHtml, getPaymentReminderEmailHtml } from '@/lib/email/templates'
 import { generateInvoicePDF, type InvoiceData } from '@/lib/pdf/invoice-generator'
 
 interface CompanyMembership {
@@ -38,7 +39,9 @@ const documentSchema = z.object({
 export async function createDocument(formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -79,7 +82,14 @@ export async function createDocument(formData: FormData) {
   }
 
   // If we have expense_ids, fetch them to verify they're valid and approved
-  let expenses: { id: string, amount: number, category: string, description: string | null, merchant: string | null, project_id: string | null }[] = []
+  let expenses: {
+    id: string
+    amount: number
+    category: string
+    description: string | null
+    merchant: string | null
+    project_id: string | null
+  }[] = []
   if (expense_ids && expense_ids.length > 0) {
     const { data: expenseData, error: expError } = await supabase
       .from('expenses')
@@ -143,9 +153,12 @@ export async function createDocument(formData: FormData) {
   // Add expense lines
   const expenseLineInserts: DocumentLineInsert[] = expenses.map((expense) => {
     lineNumber++
-    const categoryLabel = expense.category === 'mileage' ? 'Kilometergeld' :
-                          expense.category === 'travel_time' ? 'Reisezeit' :
-                          'Auslagenersatz'
+    const categoryLabel =
+      expense.category === 'mileage'
+        ? 'Kilometergeld'
+        : expense.category === 'travel_time'
+          ? 'Reisezeit'
+          : 'Auslagenersatz'
     const description = `${categoryLabel}${expense.merchant ? ` - ${expense.merchant}` : ''}${expense.description ? ` (${expense.description})` : ''}`
 
     return {
@@ -164,9 +177,7 @@ export async function createDocument(formData: FormData) {
   const allLines: DocumentLineInsert[] = [...lineInserts, ...expenseLineInserts]
 
   if (allLines.length > 0) {
-    const { error: linesError } = await supabase
-      .from('document_lines')
-      .insert(allLines as never)
+    const { error: linesError } = await supabase.from('document_lines').insert(allLines as never)
 
     if (linesError) {
       console.error('Error creating document lines:', linesError)
@@ -197,7 +208,9 @@ export async function createDocument(formData: FormData) {
 export async function issueDocument(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -275,7 +288,9 @@ export async function issueDocument(id: string) {
 export async function markDocumentPaid(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -303,17 +318,15 @@ export async function markDocumentPaid(id: string) {
 export async function deleteDocument(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
 
   // Only draft documents can be deleted
-  const { error } = await supabase
-    .from('documents')
-    .delete()
-    .eq('id', id)
-    .eq('status', 'draft')
+  const { error } = await supabase.from('documents').delete().eq('id', id).eq('status', 'draft')
 
   if (error) {
     console.error('Error deleting document:', error)
@@ -328,7 +341,9 @@ export async function deleteDocument(id: string) {
 export async function generateDocumentPDF(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -348,31 +363,41 @@ export async function generateDocumentPDF(id: string) {
   }
 
   // Get document with all details
-  const { data: document, error: docError } = await supabase
+  const { data: documentData, error: docError } = await supabase
     .from('documents')
-    .select(`
+    .select(
+      `
       *,
       customer:customers(*),
       lines:document_lines(*)
-    `)
+    `
+    )
     .eq('id', id)
     .eq('company_id', membership.company_id)
     .single()
 
-  if (docError || !document) {
+  if (docError || !documentData) {
     return { error: 'Document not found' }
   }
 
+  // Type assertion for the complex query result
+  const document = documentData as DocumentRow & {
+    customer: Database['public']['Tables']['customers']['Row']
+    lines: Database['public']['Tables']['document_lines']['Row'][]
+  }
+
   // Get company details
-  const { data: company } = await supabase
+  const { data: companyData } = await supabase
     .from('companies')
     .select('*')
     .eq('id', membership.company_id)
     .single()
 
-  if (!company) {
+  if (!companyData) {
     return { error: 'Company not found' }
   }
+
+  const company = companyData as Database['public']['Tables']['companies']['Row']
 
   // Prepare invoice data
   const invoiceData: InvoiceData = {
@@ -396,17 +421,17 @@ export async function generateDocumentPDF(id: string) {
       website: company.website || undefined,
     },
     customer: {
-      name: (document.customer as { name: string }).name,
-      legalName: (document.customer as { legal_name?: string }).legal_name || undefined,
-      vatNumber: (document.customer as { vat_number?: string }).vat_number || undefined,
-      addressLine1: (document.customer as { address_line1?: string }).address_line1 || undefined,
-      addressLine2: (document.customer as { address_line2?: string }).address_line2 || undefined,
-      postalCode: (document.customer as { postal_code?: string }).postal_code || undefined,
-      city: (document.customer as { city?: string }).city || undefined,
-      country: (document.customer as { country?: string }).country || undefined,
-      email: (document.customer as { email?: string }).email || undefined,
+      name: document.customer.name,
+      legalName: document.customer.legal_name || undefined,
+      vatNumber: document.customer.vat_number || undefined,
+      addressLine1: document.customer.address_line1 || undefined,
+      addressLine2: document.customer.address_line2 || undefined,
+      postalCode: document.customer.postal_code || undefined,
+      city: document.customer.city || undefined,
+      country: document.customer.country || undefined,
+      email: document.customer.email || undefined,
     },
-    lines: ((document.lines as unknown[]) || []).map((line: unknown) => {
+    lines: (document.lines || []).map((line) => {
       const l = line as {
         line_number: number
         description: string
@@ -463,7 +488,9 @@ export async function generateDocumentPDF(id: string) {
 export async function sendDocumentByEmail(id: string, recipientEmail?: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -483,18 +510,24 @@ export async function sendDocumentByEmail(id: string, recipientEmail?: string) {
   }
 
   // Get document with customer
-  const { data: document, error: docError } = await supabase
+  const { data: documentData, error: docError } = await supabase
     .from('documents')
-    .select(`
+    .select(
+      `
       *,
       customer:customers(name, email)
-    `)
+    `
+    )
     .eq('id', id)
     .eq('company_id', membership.company_id)
     .single()
 
-  if (docError || !document) {
+  if (docError || !documentData) {
     return { error: 'Document not found' }
+  }
+
+  const document = documentData as DocumentRow & {
+    customer: { name: string; email?: string }
   }
 
   if (document.status === 'draft') {
@@ -502,13 +535,15 @@ export async function sendDocumentByEmail(id: string, recipientEmail?: string) {
   }
 
   // Get company name
-  const { data: company } = await supabase
+  const { data: companyResult } = await supabase
     .from('companies')
     .select('name')
     .eq('id', membership.company_id)
     .single()
 
-  const customerEmail = recipientEmail || (document.customer as { email?: string })?.email
+  const companyName = (companyResult as { name: string } | null)?.name || 'BOTFORCE'
+
+  const customerEmail = recipientEmail || document.customer?.email
   if (!customerEmail) {
     return { error: 'No email address found for customer' }
   }
@@ -526,17 +561,17 @@ export async function sendDocumentByEmail(id: string, recipientEmail?: string) {
   // Send email
   const docTypeLabel = document.document_type === 'invoice' ? 'Invoice' : 'Credit Note'
   const emailHtml = getInvoiceEmailHtml({
-    customerName: (document.customer as { name: string }).name,
+    customerName: document.customer.name,
     documentNumber: document.document_number || 'N/A',
     total: document.total,
     currency: document.currency,
     dueDate: document.due_date ? format(new Date(document.due_date), 'dd.MM.yyyy') : 'N/A',
-    companyName: company?.name || 'BOTFORCE',
+    companyName: companyName,
   })
 
   const result = await sendEmail({
     to: customerEmail,
-    subject: `${docTypeLabel} ${document.document_number} from ${company?.name || 'BOTFORCE'}`,
+    subject: `${docTypeLabel} ${document.document_number} from ${companyName}`,
     html: emailHtml,
     attachments: [
       {
@@ -559,7 +594,9 @@ export async function sendDocumentByEmail(id: string, recipientEmail?: string) {
 export async function sendPaymentReminder(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -579,54 +616,65 @@ export async function sendPaymentReminder(id: string) {
   }
 
   // Get document with customer
-  const { data: document, error: docError } = await supabase
+  const { data: reminderDocData, error: docError } = await supabase
     .from('documents')
-    .select(`
+    .select(
+      `
       *,
       customer:customers(name, email)
-    `)
+    `
+    )
     .eq('id', id)
     .eq('company_id', membership.company_id)
     .single()
 
-  if (docError || !document) {
+  if (docError || !reminderDocData) {
     return { error: 'Document not found' }
   }
 
-  if (document.status !== 'issued') {
+  const reminderDoc = reminderDocData as DocumentRow & {
+    customer: { name: string; email?: string }
+  }
+
+  if (reminderDoc.status !== 'issued') {
     return { error: 'Can only send reminders for issued (unpaid) invoices' }
   }
 
-  const customerEmail = (document.customer as { email?: string })?.email
+  const customerEmail = reminderDoc.customer?.email
   if (!customerEmail) {
     return { error: 'No email address found for customer' }
   }
 
   // Get company name
-  const { data: company } = await supabase
+  const { data: reminderCompanyData } = await supabase
     .from('companies')
     .select('name')
     .eq('id', membership.company_id)
     .single()
 
+  const reminderCompanyName = (reminderCompanyData as { name: string } | null)?.name || 'BOTFORCE'
+
   // Calculate days overdue
-  const dueDate = document.due_date ? new Date(document.due_date) : new Date()
+  const dueDate = reminderDoc.due_date ? new Date(reminderDoc.due_date) : new Date()
   const today = new Date()
-  const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
+  const daysOverdue = Math.max(
+    0,
+    Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+  )
 
   const emailHtml = getPaymentReminderEmailHtml({
-    customerName: (document.customer as { name: string }).name,
-    documentNumber: document.document_number || 'N/A',
-    total: document.total,
-    currency: document.currency,
-    dueDate: document.due_date ? format(new Date(document.due_date), 'dd.MM.yyyy') : 'N/A',
+    customerName: reminderDoc.customer.name,
+    documentNumber: reminderDoc.document_number || 'N/A',
+    total: reminderDoc.total,
+    currency: reminderDoc.currency,
+    dueDate: reminderDoc.due_date ? format(new Date(reminderDoc.due_date), 'dd.MM.yyyy') : 'N/A',
     daysOverdue,
-    companyName: company?.name || 'BOTFORCE',
+    companyName: reminderCompanyName,
   })
 
   const result = await sendEmail({
     to: customerEmail,
-    subject: `Payment Reminder: Invoice ${document.document_number} - ${daysOverdue} days overdue`,
+    subject: `Payment Reminder: Invoice ${reminderDoc.document_number} - ${daysOverdue} days overdue`,
     html: emailHtml,
   })
 

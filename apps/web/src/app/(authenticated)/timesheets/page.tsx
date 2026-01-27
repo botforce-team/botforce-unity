@@ -13,27 +13,51 @@ interface SearchParams {
   year?: string
 }
 
-export default async function TimesheetsPage({
-  searchParams,
-}: {
-  searchParams: SearchParams
-}) {
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
+interface TimeEntryWithRelations {
+  id: string
+  date: string
+  hours: number
+  description: string | null
+  status: string
+  rejection_reason: string | null
+  user_id: string
+  project_id: string
+  project: { id: string; name: string; code: string | null } | null
+  profile: { id: string; email: string; first_name: string | null; last_name: string | null } | null
+}
+
+interface ProjectOption {
+  id: string
+  name: string
+  code: string | null
+}
+
+export default async function TimesheetsPage({ searchParams }: { searchParams: SearchParams }) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
+  const membership = membershipData as CompanyMembership | null
+
   if (!membership) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
       </div>
     )
@@ -43,21 +67,25 @@ export default async function TimesheetsPage({
   const isAdmin = role === 'superadmin'
 
   // Fetch projects for filter
-  const { data: projects } = await supabase
+  const { data: projectsData } = await supabase
     .from('projects')
     .select('id, name, code')
     .eq('company_id', company_id)
     .eq('is_active', true)
     .order('name')
 
+  const projects = (projectsData || []) as ProjectOption[]
+
   // Fetch time entries based on role
   let timeEntriesQuery = supabase
     .from('time_entries')
-    .select(`
+    .select(
+      `
       *,
       project:projects(id, name, code),
       profile:profiles!time_entries_user_id_fkey(id, email, first_name, last_name)
-    `)
+    `
+    )
     .eq('company_id', company_id)
     .order('date', { ascending: false })
     .limit(200)
@@ -72,7 +100,8 @@ export default async function TimesheetsPage({
   }
 
   // Apply date filters
-  const filterYear = searchParams.year || (searchParams.month ? new Date().getFullYear().toString() : null)
+  const filterYear =
+    searchParams.year || (searchParams.month ? new Date().getFullYear().toString() : null)
 
   if (searchParams.month && filterYear) {
     // Filter by specific month and year
@@ -87,39 +116,51 @@ export default async function TimesheetsPage({
     timeEntriesQuery = timeEntriesQuery.gte('date', startDate).lte('date', endDate)
   }
 
-  const { data: timeEntries } = await timeEntriesQuery
+  const { data: timeEntriesData } = await timeEntriesQuery
+  const timeEntries = (timeEntriesData || []) as TimeEntryWithRelations[]
 
   // Group by project, then by month, then by day
-  const groupedByProject = (timeEntries || []).reduce((acc, entry) => {
-    const projectId = entry.project_id
-    const projectName = entry.project?.name || 'Unknown Project'
-    const projectCode = entry.project?.code || ''
-    const projectKey = `${projectId}|${projectName}|${projectCode}`
+  const groupedByProject = timeEntries.reduce(
+    (acc, entry) => {
+      const projectId = entry.project_id
+      const projectName = entry.project?.name || 'Unknown Project'
+      const projectCode = entry.project?.code || ''
+      const projectKey = `${projectId}|${projectName}|${projectCode}`
 
-    if (!acc[projectKey]) {
-      acc[projectKey] = {
-        projectId,
-        projectName,
-        projectCode,
-        months: {} as Record<string, Record<string, typeof timeEntries>>
+      if (!acc[projectKey]) {
+        acc[projectKey] = {
+          projectId,
+          projectName,
+          projectCode,
+          months: {} as Record<string, Record<string, typeof timeEntries>>,
+        }
       }
-    }
 
-    // Group by month (YYYY-MM format)
-    const month = entry.date.substring(0, 7)
-    if (!acc[projectKey].months[month]) {
-      acc[projectKey].months[month] = {}
-    }
+      // Group by month (YYYY-MM format)
+      const month = entry.date.substring(0, 7)
+      if (!acc[projectKey].months[month]) {
+        acc[projectKey].months[month] = {}
+      }
 
-    // Group by day within month
-    const day = entry.date
-    if (!acc[projectKey].months[month][day]) {
-      acc[projectKey].months[month][day] = []
-    }
-    acc[projectKey].months[month][day].push(entry)
+      // Group by day within month
+      const day = entry.date
+      if (!acc[projectKey].months[month][day]) {
+        acc[projectKey].months[month][day] = []
+      }
+      acc[projectKey].months[month][day].push(entry)
 
-    return acc
-  }, {} as Record<string, { projectId: string; projectName: string; projectCode: string; months: Record<string, Record<string, typeof timeEntries>> }>)
+      return acc
+    },
+    {} as Record<
+      string,
+      {
+        projectId: string
+        projectName: string
+        projectCode: string
+        months: Record<string, Record<string, typeof timeEntries>>
+      }
+    >
+  )
 
   const projectKeys = Object.keys(groupedByProject).sort((a, b) => {
     const nameA = a.split('|')[1]
@@ -128,11 +169,31 @@ export default async function TimesheetsPage({
   })
 
   const statusStyles: Record<string, { bg: string; border: string; color: string }> = {
-    draft: { bg: 'rgba(255, 255, 255, 0.08)', border: 'rgba(255, 255, 255, 0.12)', color: 'rgba(255, 255, 255, 0.6)' },
-    submitted: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
-    approved: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
-    rejected: { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-    invoiced: { bg: 'rgba(139, 92, 246, 0.12)', border: 'rgba(139, 92, 246, 0.35)', color: '#a78bfa' },
+    draft: {
+      bg: 'rgba(255, 255, 255, 0.08)',
+      border: 'rgba(255, 255, 255, 0.12)',
+      color: 'rgba(255, 255, 255, 0.6)',
+    },
+    submitted: {
+      bg: 'rgba(245, 158, 11, 0.12)',
+      border: 'rgba(245, 158, 11, 0.35)',
+      color: '#f59e0b',
+    },
+    approved: {
+      bg: 'rgba(34, 197, 94, 0.12)',
+      border: 'rgba(34, 197, 94, 0.35)',
+      color: '#22c55e',
+    },
+    rejected: {
+      bg: 'rgba(239, 68, 68, 0.12)',
+      border: 'rgba(239, 68, 68, 0.35)',
+      color: '#ef4444',
+    },
+    invoiced: {
+      bg: 'rgba(139, 92, 246, 0.12)',
+      border: 'rgba(139, 92, 246, 0.35)',
+      color: '#a78bfa',
+    },
   }
 
   const formatMonth = (monthStr: string) => {
@@ -152,7 +213,7 @@ export default async function TimesheetsPage({
         </div>
         <Link
           href="/timesheets/new"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-[13px] font-semibold text-white"
+          className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-semibold text-white"
           style={{ background: '#1f5bff' }}
         >
           <Plus className="h-4 w-4" />
@@ -170,7 +231,7 @@ export default async function TimesheetsPage({
 
       {projectKeys.length === 0 ? (
         <div
-          className="py-12 rounded-[18px] text-center"
+          className="rounded-[18px] py-12 text-center"
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -184,11 +245,21 @@ export default async function TimesheetsPage({
       ) : (
         <div className="space-y-8">
           {projectKeys.map((projectKey) => {
-            const { projectId, projectName, projectCode, months } = groupedByProject[projectKey]
+            const {
+              projectId: _projectId,
+              projectName,
+              projectCode,
+              months,
+            } = groupedByProject[projectKey]
             const monthKeys = Object.keys(months).sort((a, b) => b.localeCompare(a))
             // Calculate total hours across all months and days
             const totalProjectHours = Object.values(months).reduce((monthSum, days) => {
-              return monthSum + Object.values(days).flat().reduce((daySum, e) => daySum + Number(e?.hours || 0), 0)
+              return (
+                monthSum +
+                Object.values(days)
+                  .flat()
+                  .reduce((daySum, e) => daySum + Number(e?.hours || 0), 0)
+              )
             }, 0)
 
             return (
@@ -198,7 +269,10 @@ export default async function TimesheetsPage({
                   <div className="flex items-center gap-3">
                     <h2 className="text-[18px] font-bold text-white">{projectName}</h2>
                     {projectCode && (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-medium text-[rgba(232,236,255,0.5)]" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <span
+                        className="rounded px-2 py-0.5 text-[11px] font-medium text-[rgba(232,236,255,0.5)]"
+                        style={{ background: 'rgba(255,255,255,0.08)' }}
+                      >
                         {projectCode}
                       </span>
                     )}
@@ -212,12 +286,14 @@ export default async function TimesheetsPage({
                 {monthKeys.map((month) => {
                   const days = months[month]
                   const dayKeys = Object.keys(days).sort((a, b) => b.localeCompare(a))
-                  const monthHours = Object.values(days).flat().reduce((sum, e) => sum + Number(e?.hours || 0), 0)
+                  const monthHours = Object.values(days)
+                    .flat()
+                    .reduce((sum, e) => sum + Number(e?.hours || 0), 0)
 
                   return (
                     <div
                       key={month}
-                      className="rounded-[18px] overflow-hidden"
+                      className="overflow-hidden rounded-[18px]"
                       style={{
                         background: 'rgba(255, 255, 255, 0.04)',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -225,17 +301,22 @@ export default async function TimesheetsPage({
                     >
                       {/* Month Header */}
                       <div
-                        className="px-5 py-3 flex items-center justify-between"
+                        className="flex items-center justify-between px-5 py-3"
                         style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
                       >
-                        <h3 className="text-[15px] font-semibold text-white">{formatMonth(month)}</h3>
+                        <h3 className="text-[15px] font-semibold text-white">
+                          {formatMonth(month)}
+                        </h3>
                         <span className="text-[13px] font-medium text-[rgba(232,236,255,0.6)]">
                           {monthHours.toFixed(1)} hours
                         </span>
                       </div>
 
                       {/* Days */}
-                      <div className="divide-y" style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}>
+                      <div
+                        className="divide-y"
+                        style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}
+                      >
                         {dayKeys.map((day) => (
                           <DayEntries
                             key={day}

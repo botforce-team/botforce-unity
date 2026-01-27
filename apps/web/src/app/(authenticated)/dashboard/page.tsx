@@ -2,6 +2,21 @@ import { createClient } from '@/lib/supabase/server'
 import { Clock, FileText, Receipt, FolderKanban } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
+interface TimeEntry {
+  hours: number
+  status: string
+}
+
+interface Document {
+  total: number
+  status: string
+}
+
 function MetricCard({
   title,
   value,
@@ -15,24 +30,20 @@ function MetricCard({
 }) {
   return (
     <div
-      className="p-4 rounded-[16px]"
+      className="rounded-[16px] p-4"
       style={{
         background: 'rgba(255, 255, 255, 0.08)',
         border: '1px solid rgba(255, 255, 255, 0.12)',
       }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wider">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[rgba(232,236,255,0.68)]">
           {title}
         </span>
         <Icon className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
       </div>
-      <div className="text-[24px] font-extrabold text-white tracking-tight">
-        {value}
-      </div>
-      <p className="text-[11px] text-[rgba(232,236,255,0.5)] mt-1">
-        {subtitle}
-      </p>
+      <div className="text-[24px] font-extrabold tracking-tight text-white">{value}</div>
+      <p className="mt-1 text-[11px] text-[rgba(232,236,255,0.5)]">{subtitle}</p>
     </div>
   )
 }
@@ -40,28 +51,34 @@ function MetricCard({
 export default async function DashboardPage() {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
+  const membership = membershipData as CompanyMembership | null
+
   if (!membership) {
     return (
       <div
-        className="text-center py-12 rounded-[18px]"
+        className="rounded-[18px] py-12 text-center"
         style={{
           background: 'rgba(255, 255, 255, 0.04)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
         <h2 className="text-xl font-semibold text-white">No Company Access</h2>
-        <p className="mt-2 text-[rgba(232,236,255,0.68)]">You are not assigned to any company yet.</p>
+        <p className="mt-2 text-[rgba(232,236,255,0.68)]">
+          You are not assigned to any company yet.
+        </p>
       </div>
     )
   }
@@ -91,12 +108,11 @@ export default async function DashboardPage() {
       timeEntriesQuery.eq('user_id', user.id)
     }
 
-    const { data: timeEntries } = await timeEntriesQuery
+    const { data: timeEntriesData } = await timeEntriesQuery
+    const timeEntries = (timeEntriesData || []) as TimeEntry[]
 
-    if (timeEntries) {
-      pendingTimeEntries = timeEntries.filter(e => e.status === 'submitted').length
-      totalHoursThisMonth = timeEntries.reduce((sum, e) => sum + Number(e.hours), 0)
-    }
+    pendingTimeEntries = timeEntries.filter((e) => e.status === 'submitted').length
+    totalHoursThisMonth = timeEntries.reduce((sum, e) => sum + Number(e.hours), 0)
   }
 
   // Document stats (for admins and accountants)
@@ -104,19 +120,19 @@ export default async function DashboardPage() {
   let totalRevenue = 0
 
   if (isAdmin || isAccountant) {
-    const { data: documents } = await supabase
+    const { data: documentsData } = await supabase
       .from('documents')
       .select('total, status')
       .eq('company_id', company_id)
       .eq('document_type', 'invoice')
       .in('status', ['issued', 'paid'])
 
-    if (documents) {
-      unpaidInvoices = documents.filter(d => d.status === 'issued').length
-      totalRevenue = documents
-        .filter(d => d.status === 'paid')
-        .reduce((sum, d) => sum + Number(d.total), 0)
-    }
+    const documents = (documentsData || []) as Document[]
+
+    unpaidInvoices = documents.filter((d) => d.status === 'issued').length
+    totalRevenue = documents
+      .filter((d) => d.status === 'paid')
+      .reduce((sum, d) => sum + Number(d.total), 0)
   }
 
   // Project count
@@ -156,7 +172,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
         <p className="mt-1 text-[13px] text-[rgba(232,236,255,0.68)]">
-          Welcome back! Here's an overview of your activity.
+          Welcome back! Here&apos;s an overview of your activity.
         </p>
       </div>
 

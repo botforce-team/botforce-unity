@@ -7,15 +7,33 @@ import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { updateTimeEntry, submitTimeEntry, deleteTimeEntry } from '@/app/actions/time-entries'
 
-export default function EditTimeEntryPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+interface TimeEntryWithProject {
+  id: string
+  project_id: string
+  date: string
+  hours: number
+  description: string | null
+  is_billable: boolean
+  status: string
+  rejection_reason: string | null
+  project: { id: string; name: string; code: string | null } | null
+}
+
+interface Project {
+  id: string
+  name: string
+  code: string | null
+}
+
+interface AssignmentWithProject {
+  project: Project
+}
+
+export default function EditTimeEntryPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const supabase = createClient()
-  const [entry, setEntry] = useState<any>(null)
-  const [projects, setProjects] = useState<any[]>([])
+  const [entry, setEntry] = useState<TimeEntryWithProject | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,11 +51,13 @@ export default function EditTimeEntryPage({
       if (!user.user) return
 
       // Load time entry
-      const { data: timeEntry } = await supabase
+      const { data: timeEntryData } = await supabase
         .from('time_entries')
         .select('*, project:projects(id, name, code)')
         .eq('id', params.id)
         .single()
+
+      const timeEntry = timeEntryData as TimeEntryWithProject | null
 
       if (timeEntry) {
         setEntry(timeEntry)
@@ -49,13 +69,14 @@ export default function EditTimeEntryPage({
       }
 
       // Load assigned projects
-      const { data: assignments } = await supabase
+      const { data: assignmentsData } = await supabase
         .from('project_assignments')
         .select('project:projects(id, name, code)')
         .eq('user_id', user.user.id)
         .eq('is_active', true)
 
-      setProjects(assignments?.map(a => a.project).filter(Boolean) || [])
+      const assignments = (assignmentsData || []) as AssignmentWithProject[]
+      setProjects(assignments.map((a) => a.project).filter(Boolean))
       setLoading(false)
     }
 
@@ -85,7 +106,12 @@ export default function EditTimeEntryPage({
   }
 
   async function handleSubmitEntry() {
-    if (!confirm('Submit this time entry for approval? You won\'t be able to edit it after submission.')) return
+    if (
+      !confirm(
+        "Submit this time entry for approval? You won't be able to edit it after submission."
+      )
+    )
+      return
     setSaving(true)
     const result = await submitTimeEntry(params.id)
     if (result.error) {
@@ -123,9 +149,9 @@ export default function EditTimeEntryPage({
 
   if (!entry) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-[rgba(232,236,255,0.6)]">Time entry not found.</p>
-        <Link href="/timesheets" className="text-[#1f5bff] hover:underline mt-2 inline-block">
+        <Link href="/timesheets" className="mt-2 inline-block text-[#1f5bff] hover:underline">
           Back to Timesheets
         </Link>
       </div>
@@ -135,12 +161,12 @@ export default function EditTimeEntryPage({
   const canEdit = entry.status === 'draft' || entry.status === 'rejected'
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       {/* Header */}
       <div>
         <Link
           href="/timesheets"
-          className="inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white mb-4"
+          className="mb-4 inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Timesheets
@@ -148,7 +174,7 @@ export default function EditTimeEntryPage({
         <h1 className="text-2xl font-bold text-white">Edit Time Entry</h1>
         {entry.status === 'rejected' && entry.rejection_reason && (
           <div
-            className="mt-3 p-3 rounded-[10px] text-[13px]"
+            className="mt-3 rounded-[10px] p-3 text-[13px]"
             style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
@@ -163,7 +189,7 @@ export default function EditTimeEntryPage({
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div
-          className="p-6 rounded-[18px] space-y-5"
+          className="space-y-5 rounded-[18px] p-6"
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -171,7 +197,7 @@ export default function EditTimeEntryPage({
         >
           {/* Project */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Project *
             </label>
             <select
@@ -179,7 +205,7 @@ export default function EditTimeEntryPage({
               onChange={(e) => setProjectId(e.target.value)}
               required
               disabled={!canEdit}
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none disabled:opacity-50"
+              className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none disabled:opacity-50"
               style={inputStyle}
             >
               <option value="">Select project</option>
@@ -194,7 +220,7 @@ export default function EditTimeEntryPage({
           {/* Date & Hours */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                 Date *
               </label>
               <input
@@ -203,12 +229,12 @@ export default function EditTimeEntryPage({
                 onChange={(e) => setDate(e.target.value)}
                 required
                 disabled={!canEdit}
-                className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none disabled:opacity-50"
+                className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none disabled:opacity-50"
                 style={inputStyle}
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                 Hours *
               </label>
               <input
@@ -220,7 +246,7 @@ export default function EditTimeEntryPage({
                 onChange={(e) => setHours(e.target.value)}
                 required
                 disabled={!canEdit}
-                className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none disabled:opacity-50"
+                className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none disabled:opacity-50"
                 style={inputStyle}
               />
             </div>
@@ -228,7 +254,7 @@ export default function EditTimeEntryPage({
 
           {/* Description */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Description
             </label>
             <textarea
@@ -237,7 +263,7 @@ export default function EditTimeEntryPage({
               rows={3}
               disabled={!canEdit}
               placeholder="What did you work on?"
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none resize-none disabled:opacity-50"
+              className="w-full resize-none rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none disabled:opacity-50"
               style={inputStyle}
             />
           </div>
@@ -260,7 +286,7 @@ export default function EditTimeEntryPage({
 
         {error && (
           <div
-            className="text-[13px] p-3 rounded-[10px]"
+            className="rounded-[10px] p-3 text-[13px]"
             style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
@@ -277,7 +303,7 @@ export default function EditTimeEntryPage({
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 rounded-[12px] text-[13px] font-semibold text-white disabled:opacity-50"
+              className="rounded-[12px] px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
               style={{ background: '#1f5bff' }}
             >
               {saving ? 'Saving...' : 'Save Changes'}
@@ -286,7 +312,7 @@ export default function EditTimeEntryPage({
               type="button"
               onClick={handleSubmitEntry}
               disabled={saving}
-              className="px-5 py-2.5 rounded-[12px] text-[13px] font-medium text-white disabled:opacity-50"
+              className="rounded-[12px] px-5 py-2.5 text-[13px] font-medium text-white disabled:opacity-50"
               style={{ background: '#22c55e' }}
             >
               Submit for Approval
@@ -295,7 +321,7 @@ export default function EditTimeEntryPage({
               type="button"
               onClick={handleDelete}
               disabled={saving}
-              className="px-5 py-2.5 rounded-[12px] text-[13px] font-medium text-[rgba(239,68,68,0.9)] disabled:opacity-50"
+              className="rounded-[12px] px-5 py-2.5 text-[13px] font-medium text-[rgba(239,68,68,0.9)] disabled:opacity-50"
               style={{
                 background: 'rgba(239, 68, 68, 0.12)',
                 border: '1px solid rgba(239, 68, 68, 0.35)',

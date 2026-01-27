@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { sendEmail, getTeamInviteEmailHtml } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
+import { getTeamInviteEmailHtml } from '@/lib/email/templates'
 import type { UserRole } from '@/types/database'
 
 interface CompanyMembership {
@@ -13,7 +14,9 @@ interface CompanyMembership {
 export async function updateCompanyInfo(formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -36,9 +39,9 @@ export async function updateCompanyInfo(formData: FormData) {
     .from('companies')
     .update({
       name: formData.get('name') as string,
-      legal_name: formData.get('legal_name') as string || null,
-      vat_number: formData.get('vat_number') as string || null,
-      registration_number: formData.get('registration_number') as string || null,
+      legal_name: (formData.get('legal_name') as string) || null,
+      vat_number: (formData.get('vat_number') as string) || null,
+      registration_number: (formData.get('registration_number') as string) || null,
     } as never)
     .eq('id', membership.company_id)
 
@@ -54,7 +57,9 @@ export async function updateCompanyInfo(formData: FormData) {
 export async function updateCompanyAddress(formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -76,11 +81,11 @@ export async function updateCompanyAddress(formData: FormData) {
   const { error } = await supabase
     .from('companies')
     .update({
-      address_line1: formData.get('address_line1') as string || null,
-      address_line2: formData.get('address_line2') as string || null,
-      postal_code: formData.get('postal_code') as string || null,
-      city: formData.get('city') as string || null,
-      country: formData.get('country') as string || 'AT',
+      address_line1: (formData.get('address_line1') as string) || null,
+      address_line2: (formData.get('address_line2') as string) || null,
+      postal_code: (formData.get('postal_code') as string) || null,
+      city: (formData.get('city') as string) || null,
+      country: (formData.get('country') as string) || 'AT',
     } as never)
     .eq('id', membership.company_id)
 
@@ -96,7 +101,9 @@ export async function updateCompanyAddress(formData: FormData) {
 export async function updateCompanyContact(formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -118,9 +125,9 @@ export async function updateCompanyContact(formData: FormData) {
   const { error } = await supabase
     .from('companies')
     .update({
-      email: formData.get('email') as string || null,
-      phone: formData.get('phone') as string || null,
-      website: formData.get('website') as string || null,
+      email: (formData.get('email') as string) || null,
+      phone: (formData.get('phone') as string) || null,
+      website: (formData.get('website') as string) || null,
     } as never)
     .eq('id', membership.company_id)
 
@@ -138,7 +145,9 @@ export async function inviteTeamMember(formData: FormData) {
   const supabase = createClient()
   const serviceClient = createServiceClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -161,7 +170,9 @@ export async function inviteTeamMember(formData: FormData) {
   const role = formData.get('role') as UserRole
   const firstName = formData.get('first_name') as string
   const lastName = formData.get('last_name') as string
-  const hourlyRate = formData.get('hourly_rate') ? parseFloat(formData.get('hourly_rate') as string) : null
+  const hourlyRate = formData.get('hourly_rate')
+    ? parseFloat(formData.get('hourly_rate') as string)
+    : null
 
   if (!email || !role) {
     return { error: 'Email and role are required' }
@@ -226,13 +237,14 @@ export async function inviteTeamMember(formData: FormData) {
     }
   } else {
     // Create new user via Supabase Auth invite
-    const { data: inviteData, error: inviteError } = await serviceClient.auth.admin.inviteUserByEmail(email, {
-      data: {
-        first_name: firstName,
-        last_name: lastName,
-      },
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-    })
+    const { data: inviteData, error: inviteError } =
+      await serviceClient.auth.admin.inviteUserByEmail(email, {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        },
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      })
 
     if (inviteError) {
       console.error('Error inviting user:', inviteError)
@@ -242,14 +254,12 @@ export async function inviteTeamMember(formData: FormData) {
     userId = inviteData.user.id
 
     // Create profile for new user
-    const { error: profileError } = await serviceClient
-      .from('profiles')
-      .insert({
-        id: userId,
-        email: email,
-        first_name: firstName || null,
-        last_name: lastName || null,
-      } as never)
+    const { error: profileError } = await serviceClient.from('profiles').insert({
+      id: userId,
+      email: email,
+      first_name: firstName || null,
+      last_name: lastName || null,
+    } as never)
 
     if (profileError) {
       console.error('Error creating profile:', profileError)
@@ -258,16 +268,14 @@ export async function inviteTeamMember(formData: FormData) {
   }
 
   // Create company membership
-  const { error: memberError } = await supabase
-    .from('company_members')
-    .insert({
-      company_id: membership.company_id,
-      user_id: userId,
-      role: role,
-      hourly_rate: hourlyRate,
-      invited_at: new Date().toISOString(),
-      is_active: true,
-    } as never)
+  const { error: memberError } = await supabase.from('company_members').insert({
+    company_id: membership.company_id,
+    user_id: userId,
+    role: role,
+    hourly_rate: hourlyRate,
+    invited_at: new Date().toISOString(),
+    is_active: true,
+  } as never)
 
   if (memberError) {
     console.error('Error creating membership:', memberError)
@@ -296,7 +304,9 @@ export async function inviteTeamMember(formData: FormData) {
 export async function updateTeamMemberRole(memberId: string, newRole: UserRole) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -334,7 +344,9 @@ export async function updateTeamMemberRole(memberId: string, newRole: UserRole) 
 export async function removeTeamMember(memberId: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -389,7 +401,9 @@ export async function removeTeamMember(memberId: string) {
 export async function updateTeamMemberHourlyRate(memberId: string, hourlyRate: number | null) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }

@@ -1,8 +1,34 @@
 import { createClient } from '@/lib/supabase/server'
-import { Plus, Receipt, Upload } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, formatCurrency } from '@/lib/utils'
-import { SubmitExpenseButton, ApproveExpenseButton, RejectExpenseButton, DeleteExpenseButton } from './expense-actions'
+import {
+  SubmitExpenseButton,
+  ApproveExpenseButton,
+  RejectExpenseButton,
+  DeleteExpenseButton,
+  ViewReceiptButton,
+  UploadReceiptButton,
+} from './expense-actions'
+
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
+interface ExpenseWithRelations {
+  id: string
+  date: string
+  amount: number
+  category: string
+  status: string
+  description: string | null
+  merchant: string | null
+  receipt_file_id: string | null
+  user_id: string
+  profile: { id: string; email: string; first_name: string | null; last_name: string | null } | null
+  project: { id: string; name: string; code: string | null } | null
+}
 
 function getStatusStyle(status: string) {
   switch (status) {
@@ -48,20 +74,24 @@ function getStatusStyle(status: string) {
 export default async function ExpensesPage() {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
+  const membership = membershipData as CompanyMembership | null
+
   if (!membership) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
       </div>
     )
@@ -75,11 +105,13 @@ export default async function ExpensesPage() {
   // Use explicit foreign key hint for profile join since there are multiple FKs to profiles
   let expensesQuery = supabase
     .from('expenses')
-    .select(`
+    .select(
+      `
       *,
       profile:profiles!expenses_user_id_fkey(id, email, first_name, last_name),
       project:projects(id, name, code)
-    `)
+    `
+    )
     .eq('company_id', company_id)
     .order('date', { ascending: false })
     .limit(50)
@@ -89,16 +121,17 @@ export default async function ExpensesPage() {
     expensesQuery = expensesQuery.eq('user_id', user.id)
   }
 
-  const { data: expenses } = await expensesQuery
+  const { data: expensesData } = await expensesQuery
+  const expenses = (expensesData || []) as ExpenseWithRelations[]
 
   // Calculate totals
-  const totalAmount = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0
+  const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
   const pendingAmount = expenses
-    ?.filter(e => e.status === 'submitted')
-    .reduce((sum, e) => sum + Number(e.amount), 0) || 0
+    .filter((e) => e.status === 'submitted')
+    .reduce((sum, e) => sum + Number(e.amount), 0)
   const approvedAmount = expenses
-    ?.filter(e => e.status === 'approved')
-    .reduce((sum, e) => sum + Number(e.amount), 0) || 0
+    .filter((e) => e.status === 'approved')
+    .reduce((sum, e) => sum + Number(e.amount), 0)
 
   const canCreateExpense = !isAccountant
 
@@ -113,15 +146,17 @@ export default async function ExpensesPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Expenses</h1>
           <p className="mt-1 text-[13px] text-[rgba(232,236,255,0.68)]">
-            {isAdmin ? 'Review and approve expenses' :
-             isAccountant ? 'View all expenses' :
-             'Submit and track your expenses'}
+            {isAdmin
+              ? 'Review and approve expenses'
+              : isAccountant
+                ? 'View all expenses'
+                : 'Submit and track your expenses'}
           </p>
         </div>
         {canCreateExpense && (
           <Link
             href="/expenses/new"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-[13px] font-semibold text-white"
+            className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-semibold text-white"
             style={{ background: '#1f5bff' }}
           >
             <Plus className="h-4 w-4" />
@@ -132,32 +167,28 @@ export default async function ExpensesPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-white">{formatCurrency(totalAmount)}</div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Total Expenses</p>
         </div>
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
-          <div className="text-2xl font-bold text-[#f59e0b]">
-            {formatCurrency(pendingAmount)}
-          </div>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
+          <div className="text-2xl font-bold text-[#f59e0b]">{formatCurrency(pendingAmount)}</div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Pending Approval</p>
         </div>
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
-          <div className="text-2xl font-bold text-[#22c55e]">
-            {formatCurrency(approvedAmount)}
-          </div>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
+          <div className="text-2xl font-bold text-[#22c55e]">{formatCurrency(approvedAmount)}</div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Approved</p>
         </div>
       </div>
 
       {/* Expenses List */}
-      <div className="rounded-[18px] overflow-hidden" style={cardStyle}>
-        <div className="p-5 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+      <div className="overflow-hidden rounded-[18px]" style={cardStyle}>
+        <div className="border-b p-5" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
           <h2 className="text-[15px] font-semibold text-white">All Expenses</h2>
         </div>
         <div className="p-5">
           {!expenses || expenses.length === 0 ? (
-            <p className="text-center text-[rgba(232,236,255,0.6)] py-8 text-[13px]">
+            <p className="py-8 text-center text-[13px] text-[rgba(232,236,255,0.6)]">
               No expenses yet.
               {canCreateExpense && ' Click "New Expense" to add your first expense.'}
             </p>
@@ -165,13 +196,17 @@ export default async function ExpensesPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide" style={{ borderColor: 'rgba(255, 255, 255, 0.08)', color: 'rgba(232, 236, 255, 0.5)' }}>
+                  <tr
+                    className="border-b text-left text-[11px] font-semibold uppercase tracking-wide"
+                    style={{
+                      borderColor: 'rgba(255, 255, 255, 0.08)',
+                      color: 'rgba(232, 236, 255, 0.5)',
+                    }}
+                  >
                     <th className="pb-3">Date</th>
                     <th className="pb-3">Category</th>
                     <th className="pb-3">Description</th>
-                    {(isAdmin || isAccountant) && (
-                      <th className="pb-3">Employee</th>
-                    )}
+                    {(isAdmin || isAccountant) && <th className="pb-3">Employee</th>}
                     <th className="pb-3">Project</th>
                     <th className="pb-3 text-right">Amount</th>
                     <th className="pb-3">Status</th>
@@ -183,13 +218,15 @@ export default async function ExpensesPage() {
                   {expenses.map((expense) => (
                     <tr
                       key={expense.id}
-                      className="text-[13px] border-b last:border-0"
+                      className="border-b text-[13px] last:border-0"
                       style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}
                     >
-                      <td className="py-3 text-[rgba(232,236,255,0.6)]">{formatDate(expense.date)}</td>
+                      <td className="py-3 text-[rgba(232,236,255,0.6)]">
+                        {formatDate(expense.date)}
+                      </td>
                       <td className="py-3">
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-medium uppercase"
+                          className="rounded px-2 py-0.5 text-[10px] font-medium uppercase"
                           style={{
                             background: 'rgba(255, 255, 255, 0.08)',
                             border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -203,7 +240,7 @@ export default async function ExpensesPage() {
                         <div>
                           <p className="font-medium text-white">{expense.merchant || '-'}</p>
                           {expense.description && (
-                            <p className="text-[11px] text-[rgba(232,236,255,0.5)] truncate max-w-xs">
+                            <p className="max-w-xs truncate text-[11px] text-[rgba(232,236,255,0.5)]">
                               {expense.description}
                             </p>
                           )}
@@ -222,7 +259,7 @@ export default async function ExpensesPage() {
                       </td>
                       <td className="py-3">
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
                           style={getStatusStyle(expense.status)}
                         >
                           {expense.status}
@@ -230,9 +267,11 @@ export default async function ExpensesPage() {
                       </td>
                       <td className="py-3">
                         {expense.receipt_file_id ? (
-                          <Receipt className="h-4 w-4 text-[#22c55e]" />
+                          <ViewReceiptButton expenseId={expense.id} />
+                        ) : expense.status === 'draft' && expense.user_id === user.id ? (
+                          <UploadReceiptButton expenseId={expense.id} />
                         ) : (
-                          <Upload className="h-4 w-4 text-[rgba(255,255,255,0.2)]" />
+                          <span className="text-[rgba(255,255,255,0.2)]">-</span>
                         )}
                       </td>
                       <td className="py-3">

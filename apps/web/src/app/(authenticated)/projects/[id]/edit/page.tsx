@@ -55,18 +55,20 @@ export default function EditProjectPage() {
       setLoadingData(true)
 
       // Load customers
-      const { data: customersData } = await supabase
+      const { data: customersDataRaw } = await supabase
         .from('customers')
         .select('id, name')
         .order('name')
-      setCustomers(customersData || [])
+      setCustomers((customersDataRaw || []) as Customer[])
 
       // Load project
-      const { data: projectData } = await supabase
+      const { data: projectDataRaw } = await supabase
         .from('projects')
         .select('*')
         .eq('id', projectId)
         .single()
+
+      const projectData = projectDataRaw as Project | null
 
       if (projectData) {
         setProject(projectData)
@@ -122,7 +124,7 @@ export default function EditProjectPage() {
 
   if (loadingData) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-[rgba(232,236,255,0.6)]">Loading...</div>
       </div>
     )
@@ -130,19 +132,19 @@ export default function EditProjectPage() {
 
   if (!project) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-[rgba(232,236,255,0.6)]">Project not found</p>
       </div>
     )
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       {/* Header */}
       <div>
         <Link
           href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white mb-4"
+          className="mb-4 inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Project
@@ -156,7 +158,7 @@ export default function EditProjectPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div
-          className="p-6 rounded-[18px] space-y-5"
+          className="space-y-5 rounded-[18px] p-6"
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -164,26 +166,28 @@ export default function EditProjectPage() {
         >
           {/* Customer */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Customer *
             </label>
             <select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               required
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none"
+              className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none"
               style={inputStyle}
             >
               <option value="">Select customer</option>
               {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
 
           {/* Project Name */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Project Name *
             </label>
             <input
@@ -192,14 +196,14 @@ export default function EditProjectPage() {
               onChange={(e) => setName(e.target.value)}
               required
               placeholder="e.g. Website Redesign"
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
+              className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
               style={inputStyle}
             />
           </div>
 
           {/* Project Code */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Project Code
             </label>
             <input
@@ -207,14 +211,14 @@ export default function EditProjectPage() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="e.g. ACME-WEB"
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
+              className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
               style={inputStyle}
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Description
             </label>
             <textarea
@@ -222,18 +226,18 @@ export default function EditProjectPage() {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Brief project description..."
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none resize-none"
+              className="w-full resize-none rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
               style={inputStyle}
             />
           </div>
 
           {/* Billing Type */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Billing Type *
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="radio"
                   name="billing_type"
@@ -244,7 +248,7 @@ export default function EditProjectPage() {
                 />
                 <span className="text-[13px] text-white">Hourly</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="radio"
                   name="billing_type"
@@ -260,11 +264,11 @@ export default function EditProjectPage() {
 
           {/* Time Recording Mode */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Time Recording Mode
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="radio"
                   name="time_recording_mode"
@@ -275,7 +279,7 @@ export default function EditProjectPage() {
                 />
                 <span className="text-[13px] text-white">Direct Hours</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="radio"
                   name="time_recording_mode"
@@ -298,7 +302,7 @@ export default function EditProjectPage() {
           <div className="grid grid-cols-2 gap-4">
             {billingType === 'hourly' ? (
               <div>
-                <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                   Hourly Rate (EUR)
                 </label>
                 <input
@@ -308,13 +312,13 @@ export default function EditProjectPage() {
                   step="0.01"
                   min="0"
                   placeholder="e.g. 85.00"
-                  className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
+                  className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
                   style={inputStyle}
                 />
               </div>
             ) : (
               <div>
-                <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                   Fixed Price (EUR)
                 </label>
                 <input
@@ -324,13 +328,13 @@ export default function EditProjectPage() {
                   step="0.01"
                   min="0"
                   placeholder="e.g. 5000.00"
-                  className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
+                  className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
                   style={inputStyle}
                 />
               </div>
             )}
             <div>
-              <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                 Budget Hours
               </label>
               <input
@@ -340,7 +344,7 @@ export default function EditProjectPage() {
                 step="0.5"
                 min="0"
                 placeholder="e.g. 100"
-                className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
+                className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
                 style={inputStyle}
               />
             </div>
@@ -363,7 +367,7 @@ export default function EditProjectPage() {
 
         {error && (
           <div
-            className="text-[13px] p-3 rounded-[10px]"
+            className="rounded-[10px] p-3 text-[13px]"
             style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
@@ -379,15 +383,18 @@ export default function EditProjectPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2.5 rounded-[12px] text-[13px] font-semibold text-white disabled:opacity-50"
+            className="rounded-[12px] px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
             style={{ background: '#1f5bff' }}
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </button>
           <Link
             href={`/projects/${projectId}`}
-            className="px-5 py-2.5 rounded-[12px] text-[13px] font-medium text-[rgba(255,255,255,0.8)]"
-            style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.12)' }}
+            className="rounded-[12px] px-5 py-2.5 text-[13px] font-medium text-[rgba(255,255,255,0.8)]"
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+            }}
           >
             Cancel
           </Link>

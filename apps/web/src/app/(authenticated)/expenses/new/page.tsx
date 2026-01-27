@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Car, Clock, Receipt, Info } from 'lucide-react'
-import { createExpense } from '@/app/actions/expenses'
+import { createExpense, uploadReceipt } from '@/app/actions/expenses'
 import { createClient } from '@/lib/supabase/client'
+import { ReceiptUpload, ReceiptUploading } from '@/components/expenses/receipt-upload'
 
 // Austrian standard mileage rate (Kilometergeld)
 const MILEAGE_RATE_DEFAULT = 0.42
@@ -35,19 +36,22 @@ const categoryInfo = {
     icon: Car,
     title: 'Kilometergeld',
     subtitle: 'Mileage reimbursement for using your private car',
-    description: 'Austrian standard rate: €0.42/km. Enter the distance driven for business purposes.',
+    description:
+      'Austrian standard rate: €0.42/km. Enter the distance driven for business purposes.',
   },
   travel_time: {
     icon: Clock,
     title: 'Reisezeit',
     subtitle: 'Travel time at a reduced hourly rate',
-    description: 'Bill travel time at a reduced rate from your normal hourly rate (as per project agreement).',
+    description:
+      'Bill travel time at a reduced rate from your normal hourly rate (as per project agreement).',
   },
   reimbursement: {
     icon: Receipt,
     title: 'Auslagenersatz',
     subtitle: 'Expense reimbursement for tickets, meals, etc.',
-    description: 'Reimbursement for business expenses like train tickets, flights, meals, or other costs.',
+    description:
+      'Reimbursement for business expenses like train tickets, flights, meals, or other costs.',
   },
 }
 
@@ -57,9 +61,11 @@ export default function NewExpensePage() {
   const preselectedProject = searchParams.get('project')
 
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
-  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [_loadingProjects, setLoadingProjects] = useState(true)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
 
   // Form state
   const [category, setCategory] = useState<ExpenseCategory>('mileage')
@@ -99,7 +105,7 @@ export default function NewExpensePage() {
   // Update hourly rate when project changes
   useEffect(() => {
     if (projectId && category === 'travel_time') {
-      const project = projects.find(p => p.id === projectId)
+      const project = projects.find((p) => p.id === projectId)
       if (project?.hourly_rate) {
         // Default to 50% of project hourly rate for travel time
         setHourlyRate((project.hourly_rate * 0.5).toFixed(2))
@@ -150,20 +156,36 @@ export default function NewExpensePage() {
     if (result.error) {
       setError(result.error)
       setLoading(false)
-    } else {
-      router.push('/expenses')
+      return
     }
+
+    // Upload receipt if file was selected
+    if (receiptFile && result.data?.id) {
+      setUploading(true)
+      const receiptFormData = new FormData()
+      receiptFormData.set('file', receiptFile)
+
+      const uploadResult = await uploadReceipt(result.data.id, receiptFormData)
+
+      if (uploadResult.error) {
+        // Expense created but receipt upload failed - still redirect but show warning
+        console.warn('Receipt upload failed:', uploadResult.error)
+      }
+      setUploading(false)
+    }
+
+    router.push('/expenses')
   }
 
   const selectedCategoryInfo = categoryInfo[category]
-  const CategoryIcon = selectedCategoryInfo.icon
+  const _CategoryIcon = selectedCategoryInfo.icon
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="max-w-2xl space-y-6">
       <div>
         <Link
           href="/expenses"
-          className="inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white mb-4"
+          className="mb-4 inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Expenses
@@ -175,8 +197,8 @@ export default function NewExpensePage() {
       </div>
 
       {/* Category Selection */}
-      <div className="rounded-[18px] overflow-hidden" style={cardStyle}>
-        <div className="p-5 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+      <div className="overflow-hidden rounded-[18px]" style={cardStyle}>
+        <div className="border-b p-5" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
           <h2 className="text-[15px] font-semibold text-white">Expense Type</h2>
         </div>
         <div className="p-5">
@@ -190,21 +212,27 @@ export default function NewExpensePage() {
                   key={cat}
                   type="button"
                   onClick={() => setCategory(cat)}
-                  className={`p-4 rounded-[12px] text-left transition-all ${
+                  className={`rounded-[12px] p-4 text-left transition-all ${
                     isSelected ? 'ring-2 ring-[#1f5bff]' : ''
                   }`}
                   style={{
-                    background: isSelected ? 'rgba(31, 91, 255, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                    border: isSelected ? '1px solid rgba(31, 91, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isSelected
+                      ? 'rgba(31, 91, 255, 0.15)'
+                      : 'rgba(255, 255, 255, 0.04)',
+                    border: isSelected
+                      ? '1px solid rgba(31, 91, 255, 0.5)'
+                      : '1px solid rgba(255, 255, 255, 0.08)',
                   }}
                 >
-                  <Icon className={`h-5 w-5 mb-2 ${isSelected ? 'text-[#1f5bff]' : 'text-[rgba(232,236,255,0.5)]'}`} />
-                  <p className={`text-[13px] font-semibold ${isSelected ? 'text-white' : 'text-[rgba(232,236,255,0.8)]'}`}>
+                  <Icon
+                    className={`mb-2 h-5 w-5 ${isSelected ? 'text-[#1f5bff]' : 'text-[rgba(232,236,255,0.5)]'}`}
+                  />
+                  <p
+                    className={`text-[13px] font-semibold ${isSelected ? 'text-white' : 'text-[rgba(232,236,255,0.8)]'}`}
+                  >
                     {info.title}
                   </p>
-                  <p className="text-[11px] text-[rgba(232,236,255,0.5)] mt-0.5">
-                    {info.subtitle}
-                  </p>
+                  <p className="mt-0.5 text-[11px] text-[rgba(232,236,255,0.5)]">{info.subtitle}</p>
                 </button>
               )
             })}
@@ -212,10 +240,13 @@ export default function NewExpensePage() {
 
           {/* Category Info */}
           <div
-            className="mt-4 p-3 rounded-[10px] flex items-start gap-3"
-            style={{ background: 'rgba(31, 91, 255, 0.1)', border: '1px solid rgba(31, 91, 255, 0.2)' }}
+            className="mt-4 flex items-start gap-3 rounded-[10px] p-3"
+            style={{
+              background: 'rgba(31, 91, 255, 0.1)',
+              border: '1px solid rgba(31, 91, 255, 0.2)',
+            }}
           >
-            <Info className="h-4 w-4 text-[#1f5bff] mt-0.5 shrink-0" />
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#1f5bff]" />
             <p className="text-[12px] text-[rgba(232,236,255,0.7)]">
               {selectedCategoryInfo.description}
             </p>
@@ -225,15 +256,15 @@ export default function NewExpensePage() {
 
       <form onSubmit={handleSubmit}>
         {/* Expense Details */}
-        <div className="rounded-[18px] overflow-hidden" style={cardStyle}>
-          <div className="p-5 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+        <div className="overflow-hidden rounded-[18px]" style={cardStyle}>
+          <div className="border-b p-5" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
             <h2 className="text-[15px] font-semibold text-white">Details</h2>
           </div>
-          <div className="p-5 space-y-4">
+          <div className="space-y-4 p-5">
             {/* Common fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                   Date *
                 </label>
                 <input
@@ -241,18 +272,18 @@ export default function NewExpensePage() {
                   required
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                  className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                   style={inputStyle}
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                   Project
                 </label>
                 <select
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                  className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                   style={inputStyle}
                 >
                   <option value="">No project</option>
@@ -269,7 +300,7 @@ export default function NewExpensePage() {
             {category === 'mileage' && (
               <>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                     Route (From - To)
                   </label>
                   <input
@@ -277,13 +308,13 @@ export default function NewExpensePage() {
                     value={route}
                     onChange={(e) => setRoute(e.target.value)}
                     placeholder="e.g. Vienna - Graz"
-                    className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                    className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                     style={inputStyle}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                    <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                       Distance (km) *
                     </label>
                     <input
@@ -294,12 +325,12 @@ export default function NewExpensePage() {
                       value={distanceKm}
                       onChange={(e) => setDistanceKm(e.target.value)}
                       placeholder="0"
-                      className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                      className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                       style={inputStyle}
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                    <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                       Rate per km (EUR)
                     </label>
                     <input
@@ -308,7 +339,7 @@ export default function NewExpensePage() {
                       step="0.01"
                       value={ratePerKm}
                       onChange={(e) => setRatePerKm(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                      className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                       style={inputStyle}
                     />
                     <p className="mt-1 text-[11px] text-[rgba(232,236,255,0.5)]">
@@ -322,7 +353,7 @@ export default function NewExpensePage() {
             {category === 'travel_time' && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                     Hours *
                   </label>
                   <input
@@ -333,12 +364,12 @@ export default function NewExpensePage() {
                     value={hours}
                     onChange={(e) => setHours(e.target.value)}
                     placeholder="0"
-                    className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                    className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                     style={inputStyle}
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                     Hourly Rate (EUR) *
                   </label>
                   <input
@@ -349,7 +380,7 @@ export default function NewExpensePage() {
                     value={hourlyRate}
                     onChange={(e) => setHourlyRate(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                    className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                     style={inputStyle}
                   />
                   <p className="mt-1 text-[11px] text-[rgba(232,236,255,0.5)]">
@@ -362,7 +393,7 @@ export default function NewExpensePage() {
             {category === 'reimbursement' && (
               <>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                     Merchant / Vendor
                   </label>
                   <input
@@ -370,12 +401,12 @@ export default function NewExpensePage() {
                     value={merchant}
                     onChange={(e) => setMerchant(e.target.value)}
                     placeholder="e.g. ÖBB, Austrian Airlines, Hotel Wien"
-                    className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                    className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                     style={inputStyle}
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                     Amount (EUR) *
                   </label>
                   <input
@@ -386,7 +417,7 @@ export default function NewExpensePage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
+                    className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                     style={inputStyle}
                   />
                 </div>
@@ -395,7 +426,7 @@ export default function NewExpensePage() {
 
             {/* Description */}
             <div>
-              <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                 Notes / Description
               </label>
               <textarea
@@ -403,15 +434,29 @@ export default function NewExpensePage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 placeholder="Additional details about this expense..."
-                className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff] resize-none"
+                className="w-full resize-none rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none focus:ring-2 focus:ring-[#1f5bff]"
                 style={inputStyle}
               />
             </div>
 
+            {/* Receipt Upload */}
+            {uploading ? (
+              <ReceiptUploading fileName={receiptFile?.name || ''} />
+            ) : (
+              <ReceiptUpload
+                onFileSelect={setReceiptFile}
+                selectedFile={receiptFile}
+                disabled={loading}
+              />
+            )}
+
             {/* Amount Preview */}
             <div
-              className="p-4 rounded-[12px]"
-              style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)' }}
+              className="rounded-[12px] p-4"
+              style={{
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.2)',
+              }}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[13px] text-[rgba(232,236,255,0.7)]">Calculated Amount</span>
@@ -423,8 +468,11 @@ export default function NewExpensePage() {
 
             {error && (
               <div
-                className="p-3 rounded-[10px] text-[13px] text-[#ef4444]"
-                style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                className="rounded-[10px] p-3 text-[13px] text-[#ef4444]"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}
               >
                 {error}
               </div>
@@ -433,15 +481,15 @@ export default function NewExpensePage() {
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
-                disabled={loading || calculatedAmount <= 0}
-                className="px-6 py-2.5 rounded-[12px] text-[13px] font-semibold text-white disabled:opacity-50"
+                disabled={loading || uploading || calculatedAmount <= 0}
+                className="rounded-[12px] px-6 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
                 style={{ background: '#1f5bff' }}
               >
-                {loading ? 'Creating...' : 'Create Expense'}
+                {uploading ? 'Uploading receipt...' : loading ? 'Creating...' : 'Create Expense'}
               </button>
               <Link
                 href="/expenses"
-                className="px-4 py-2.5 rounded-[12px] text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
+                className="rounded-[12px] px-4 py-2.5 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
               >
                 Cancel
               </Link>

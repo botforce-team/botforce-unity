@@ -3,6 +3,23 @@ import { Plus, FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
+interface DocumentWithCustomer {
+  id: string
+  document_type: string
+  document_number: string | null
+  status: string
+  issue_date: string | null
+  due_date: string | null
+  total: number
+  pdf_url: string | null
+  customer: { id: string; name: string } | null
+}
+
 function getStatusStyle(status: string) {
   switch (status) {
     case 'paid':
@@ -41,20 +58,24 @@ function getStatusStyle(status: string) {
 export default async function DocumentsPage() {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
+  const membership = membershipData as CompanyMembership | null
+
   if (!membership) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
       </div>
     )
@@ -67,26 +88,30 @@ export default async function DocumentsPage() {
   // Both admin and accountant can view documents
   if (!isAdmin && !isAccountant) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[rgba(232,236,255,0.6)]">You don't have access to documents.</p>
+      <div className="py-12 text-center">
+        <p className="text-[rgba(232,236,255,0.6)]">You don&apos;t have access to documents.</p>
       </div>
     )
   }
 
   // Fetch documents
-  const { data: documents } = await supabase
+  const { data: documentsData } = await supabase
     .from('documents')
-    .select(`
+    .select(
+      `
       *,
       customer:customers(id, name)
-    `)
+    `
+    )
     .eq('company_id', company_id)
     .order('created_at', { ascending: false })
     .limit(50)
 
+  const documents = (documentsData || []) as DocumentWithCustomer[]
+
   // Group by type
-  const invoices = documents?.filter(d => d.document_type === 'invoice') || []
-  const creditNotes = documents?.filter(d => d.document_type === 'credit_note') || []
+  const invoices = documents.filter((d) => d.document_type === 'invoice')
+  const creditNotes = documents.filter((d) => d.document_type === 'credit_note')
 
   const cardStyle = {
     background: 'rgba(255, 255, 255, 0.04)',
@@ -105,7 +130,7 @@ export default async function DocumentsPage() {
         {isAdmin && (
           <Link
             href="/documents/new"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-[13px] font-semibold text-white"
+            className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-semibold text-white"
             style={{ background: '#1f5bff' }}
           >
             <Plus className="h-4 w-4" />
@@ -116,27 +141,27 @@ export default async function DocumentsPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-white">{invoices.length}</div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Total Invoices</p>
         </div>
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-[rgba(255,255,255,0.7)]">
-            {invoices.filter(d => d.status === 'draft').length}
+            {invoices.filter((d) => d.status === 'draft').length}
           </div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Draft</p>
         </div>
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-[#f59e0b]">
-            {invoices.filter(d => d.status === 'issued').length}
+            {invoices.filter((d) => d.status === 'issued').length}
           </div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Unpaid</p>
         </div>
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-[#22c55e]">
             {formatCurrency(
               invoices
-                .filter(d => d.status === 'paid')
+                .filter((d) => d.status === 'paid')
                 .reduce((sum, d) => sum + Number(d.total), 0)
             )}
           </div>
@@ -145,13 +170,13 @@ export default async function DocumentsPage() {
       </div>
 
       {/* Documents List */}
-      <div className="rounded-[18px] overflow-hidden" style={cardStyle}>
-        <div className="p-5 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+      <div className="overflow-hidden rounded-[18px]" style={cardStyle}>
+        <div className="border-b p-5" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
           <h2 className="text-[15px] font-semibold text-white">Invoices</h2>
         </div>
         <div className="p-5">
           {invoices.length === 0 ? (
-            <p className="text-center text-[rgba(232,236,255,0.6)] py-8 text-[13px]">
+            <p className="py-8 text-center text-[13px] text-[rgba(232,236,255,0.6)]">
               No invoices yet.
               {isAdmin && ' Click "New Invoice" to create your first invoice.'}
             </p>
@@ -159,7 +184,13 @@ export default async function DocumentsPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide" style={{ borderColor: 'rgba(255, 255, 255, 0.08)', color: 'rgba(232, 236, 255, 0.5)' }}>
+                  <tr
+                    className="border-b text-left text-[11px] font-semibold uppercase tracking-wide"
+                    style={{
+                      borderColor: 'rgba(255, 255, 255, 0.08)',
+                      color: 'rgba(232, 236, 255, 0.5)',
+                    }}
+                  >
                     <th className="pb-3">Number</th>
                     <th className="pb-3">Customer</th>
                     <th className="pb-3">Date</th>
@@ -170,10 +201,10 @@ export default async function DocumentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((doc, index) => (
+                  {invoices.map((doc) => (
                     <tr
                       key={doc.id}
-                      className="text-[13px] border-b last:border-0"
+                      className="border-b text-[13px] last:border-0"
                       style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}
                     >
                       <td className="py-3">
@@ -193,7 +224,7 @@ export default async function DocumentsPage() {
                       </td>
                       <td className="py-3">
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
                           style={getStatusStyle(doc.status)}
                         >
                           {doc.status}
@@ -203,12 +234,12 @@ export default async function DocumentsPage() {
                         <div className="flex justify-end gap-2">
                           <Link
                             href={`/documents/${doc.id}`}
-                            className="p-2 rounded-[8px] text-[rgba(232,236,255,0.6)] hover:text-white hover:bg-[rgba(255,255,255,0.08)] transition-colors"
+                            className="rounded-[8px] p-2 text-[rgba(232,236,255,0.6)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
                           >
                             <FileText className="h-4 w-4" />
                           </Link>
                           {doc.pdf_url && (
-                            <button className="p-2 rounded-[8px] text-[rgba(232,236,255,0.6)] hover:text-white hover:bg-[rgba(255,255,255,0.08)] transition-colors">
+                            <button className="rounded-[8px] p-2 text-[rgba(232,236,255,0.6)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white">
                               <Download className="h-4 w-4" />
                             </button>
                           )}
@@ -224,15 +255,21 @@ export default async function DocumentsPage() {
       </div>
 
       {creditNotes.length > 0 && (
-        <div className="rounded-[18px] overflow-hidden" style={cardStyle}>
-          <div className="p-5 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+        <div className="overflow-hidden rounded-[18px]" style={cardStyle}>
+          <div className="border-b p-5" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
             <h2 className="text-[15px] font-semibold text-white">Credit Notes</h2>
           </div>
           <div className="p-5">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide" style={{ borderColor: 'rgba(255, 255, 255, 0.08)', color: 'rgba(232, 236, 255, 0.5)' }}>
+                  <tr
+                    className="border-b text-left text-[11px] font-semibold uppercase tracking-wide"
+                    style={{
+                      borderColor: 'rgba(255, 255, 255, 0.08)',
+                      color: 'rgba(232, 236, 255, 0.5)',
+                    }}
+                  >
                     <th className="pb-3">Number</th>
                     <th className="pb-3">Customer</th>
                     <th className="pb-3">Date</th>
@@ -245,7 +282,7 @@ export default async function DocumentsPage() {
                   {creditNotes.map((doc) => (
                     <tr
                       key={doc.id}
-                      className="text-[13px] border-b last:border-0"
+                      className="border-b text-[13px] last:border-0"
                       style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}
                     >
                       <td className="py-3">
@@ -262,7 +299,7 @@ export default async function DocumentsPage() {
                       </td>
                       <td className="py-3">
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
                           style={getStatusStyle(doc.status)}
                         >
                           {doc.status}
@@ -271,7 +308,7 @@ export default async function DocumentsPage() {
                       <td className="py-3">
                         <Link
                           href={`/documents/${doc.id}`}
-                          className="p-2 rounded-[8px] text-[rgba(232,236,255,0.6)] hover:text-white hover:bg-[rgba(255,255,255,0.08)] transition-colors"
+                          className="rounded-[8px] p-2 text-[rgba(232,236,255,0.6)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
                         >
                           <FileText className="h-4 w-4" />
                         </Link>

@@ -5,23 +5,52 @@ import { ArrowLeft, Clock, Users, DollarSign, Pencil } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { DeleteProjectButton, ArchiveProjectButton } from './actions'
 
-export default async function ProjectDetailPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
+interface ProjectWithCustomer {
+  id: string
+  name: string
+  code: string | null
+  description: string | null
+  billing_type: string
+  hourly_rate: number | null
+  fixed_price: number | null
+  budget_hours: number | null
+  is_active: boolean
+  customer: { id: string; name: string; email: string | null } | null
+}
+
+interface TimeEntryData {
+  hours: number
+  status: string
+}
+
+interface AssignmentWithProfile {
+  id: string
+  hourly_rate: number | null
+  profile: { id: string; email: string; first_name: string | null; last_name: string | null } | null
+}
+
+export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
+
+  const membership = membershipData as CompanyMembership | null
 
   if (!membership) {
     return notFound()
@@ -31,15 +60,19 @@ export default async function ProjectDetailPage({
   const isAdmin = role === 'superadmin'
 
   // Fetch project
-  const { data: project } = await supabase
+  const { data: projectData } = await supabase
     .from('projects')
-    .select(`
+    .select(
+      `
       *,
       customer:customers(id, name, email)
-    `)
+    `
+    )
     .eq('id', params.id)
     .eq('company_id', company_id)
     .single()
+
+  const project = projectData as ProjectWithCustomer | null
 
   if (!project) {
     return notFound()
@@ -61,24 +94,31 @@ export default async function ProjectDetailPage({
   }
 
   // Fetch project assignments
-  const { data: assignments } = await supabase
+  const { data: assignmentsData } = await supabase
     .from('project_assignments')
-    .select(`
+    .select(
+      `
       *,
       profile:profiles(id, email, first_name, last_name)
-    `)
+    `
+    )
     .eq('project_id', params.id)
     .eq('is_active', true)
 
+  const assignments = (assignmentsData || []) as AssignmentWithProfile[]
+
   // Fetch time entries for this project
-  const { data: timeEntries } = await supabase
+  const { data: timeEntriesData } = await supabase
     .from('time_entries')
     .select('hours, status')
     .eq('project_id', params.id)
 
-  const totalHours = timeEntries?.reduce((sum, e) => sum + Number(e.hours), 0) || 0
-  const approvedHours = timeEntries?.filter(e => e.status === 'approved' || e.status === 'invoiced')
-    .reduce((sum, e) => sum + Number(e.hours), 0) || 0
+  const timeEntries = (timeEntriesData || []) as TimeEntryData[]
+
+  const totalHours = timeEntries.reduce((sum, e) => sum + Number(e.hours), 0)
+  const approvedHours = timeEntries
+    .filter((e) => e.status === 'approved' || e.status === 'invoiced')
+    .reduce((sum, e) => sum + Number(e.hours), 0)
 
   return (
     <div className="space-y-6">
@@ -86,7 +126,7 @@ export default async function ProjectDetailPage({
       <div>
         <Link
           href="/projects"
-          className="inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white mb-4"
+          className="mb-4 inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Projects
@@ -99,9 +139,11 @@ export default async function ProjectDetailPage({
             </p>
           </div>
           <span
-            className="px-3 py-1 rounded-full text-[12px] font-medium"
+            className="rounded-full px-3 py-1 text-[12px] font-medium"
             style={{
-              background: project.is_active ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+              background: project.is_active
+                ? 'rgba(34, 197, 94, 0.15)'
+                : 'rgba(255, 255, 255, 0.08)',
               border: `1px solid ${project.is_active ? 'rgba(34, 197, 94, 0.35)' : 'rgba(255, 255, 255, 0.12)'}`,
               color: project.is_active ? '#4ade80' : 'rgba(255, 255, 255, 0.6)',
             }}
@@ -114,15 +156,15 @@ export default async function ProjectDetailPage({
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         <div
-          className="p-4 rounded-[16px]"
+          className="rounded-[16px] p-4"
           style={{
             background: 'rgba(255, 255, 255, 0.08)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
           }}
         >
-          <div className="flex items-center gap-2 mb-2">
+          <div className="mb-2 flex items-center gap-2">
             <Clock className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-            <span className="text-[10px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wider">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[rgba(232,236,255,0.68)]">
               Total Hours
             </span>
           </div>
@@ -133,15 +175,15 @@ export default async function ProjectDetailPage({
         </div>
 
         <div
-          className="p-4 rounded-[16px]"
+          className="rounded-[16px] p-4"
           style={{
             background: 'rgba(255, 255, 255, 0.08)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
           }}
         >
-          <div className="flex items-center gap-2 mb-2">
+          <div className="mb-2 flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-            <span className="text-[10px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wider">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[rgba(232,236,255,0.68)]">
               Billing
             </span>
           </div>
@@ -156,15 +198,15 @@ export default async function ProjectDetailPage({
         </div>
 
         <div
-          className="p-4 rounded-[16px]"
+          className="rounded-[16px] p-4"
           style={{
             background: 'rgba(255, 255, 255, 0.08)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
           }}
         >
-          <div className="flex items-center gap-2 mb-2">
+          <div className="mb-2 flex items-center gap-2">
             <Users className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-            <span className="text-[10px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wider">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[rgba(232,236,255,0.68)]">
               Team
             </span>
           </div>
@@ -177,32 +219,46 @@ export default async function ProjectDetailPage({
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Project Info */}
         <div
-          className="p-5 rounded-[18px]"
+          className="rounded-[18px] p-5"
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
           }}
         >
-          <h3 className="text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wider mb-4">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[rgba(232,236,255,0.68)]">
             Project Details
           </h3>
           <div className="space-y-3">
-            <div className="flex justify-between py-2" style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+            <div
+              className="flex justify-between py-2"
+              style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}
+            >
               <span className="text-[13px] text-[rgba(232,236,255,0.6)]">Customer</span>
               <span className="text-[13px] font-medium text-white">{project.customer?.name}</span>
             </div>
             {project.code && (
-              <div className="flex justify-between py-2" style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+              <div
+                className="flex justify-between py-2"
+                style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}
+              >
                 <span className="text-[13px] text-[rgba(232,236,255,0.6)]">Project Code</span>
                 <span className="text-[13px] font-medium text-white">{project.code}</span>
               </div>
             )}
-            <div className="flex justify-between py-2" style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+            <div
+              className="flex justify-between py-2"
+              style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}
+            >
               <span className="text-[13px] text-[rgba(232,236,255,0.6)]">Billing Type</span>
-              <span className="text-[13px] font-medium text-white capitalize">{project.billing_type}</span>
+              <span className="text-[13px] font-medium capitalize text-white">
+                {project.billing_type}
+              </span>
             </div>
             {project.budget_hours && (
-              <div className="flex justify-between py-2" style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+              <div
+                className="flex justify-between py-2"
+                style={{ borderBottom: '1px dashed rgba(255, 255, 255, 0.08)' }}
+              >
                 <span className="text-[13px] text-[rgba(232,236,255,0.6)]">Budget Hours</span>
                 <span className="text-[13px] font-medium text-white">{project.budget_hours}h</span>
               </div>
@@ -218,17 +274,19 @@ export default async function ProjectDetailPage({
 
         {/* Team Members */}
         <div
-          className="p-5 rounded-[18px]"
+          className="rounded-[18px] p-5"
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
           }}
         >
-          <h3 className="text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wider mb-4">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[rgba(232,236,255,0.68)]">
             Team Members
           </h3>
           {!assignments || assignments.length === 0 ? (
-            <p className="text-[13px] text-[rgba(232,236,255,0.5)]">No team members assigned yet.</p>
+            <p className="text-[13px] text-[rgba(232,236,255,0.5)]">
+              No team members assigned yet.
+            </p>
           ) : (
             <div className="space-y-3">
               {assignments.map((assignment) => (
@@ -239,11 +297,12 @@ export default async function ProjectDetailPage({
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className="h-8 w-8 rounded-full flex items-center justify-center"
+                      className="flex h-8 w-8 items-center justify-center rounded-full"
                       style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #1f5bff 100%)' }}
                     >
                       <span className="text-[11px] font-semibold text-white">
-                        {assignment.profile?.first_name?.[0] || assignment.profile?.email?.[0]?.toUpperCase()}
+                        {assignment.profile?.first_name?.[0] ||
+                          assignment.profile?.email?.[0]?.toUpperCase()}
                       </span>
                     </div>
                     <div>
@@ -271,14 +330,14 @@ export default async function ProjectDetailPage({
         <div className="flex flex-wrap gap-3">
           <Link
             href={`/timesheets/new?project=${project.id}`}
-            className="px-4 py-2 rounded-[12px] text-[13px] font-medium text-white transition-all"
+            className="rounded-[12px] px-4 py-2 text-[13px] font-medium text-white transition-all"
             style={{ background: '#1f5bff' }}
           >
             Log Time
           </Link>
           <Link
             href={`/documents/new?project=${project.id}`}
-            className="px-4 py-2 rounded-[12px] text-[13px] font-medium text-[rgba(255,255,255,0.8)] transition-all"
+            className="rounded-[12px] px-4 py-2 text-[13px] font-medium text-[rgba(255,255,255,0.8)] transition-all"
             style={{
               background: 'rgba(255, 255, 255, 0.08)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -288,7 +347,7 @@ export default async function ProjectDetailPage({
           </Link>
           <Link
             href={`/projects/${project.id}/edit`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-[13px] font-medium text-[rgba(255,255,255,0.8)] transition-all"
+            className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-medium text-[rgba(255,255,255,0.8)] transition-all"
             style={{
               background: 'rgba(255, 255, 255, 0.08)',
               border: '1px solid rgba(255, 255, 255, 0.12)',

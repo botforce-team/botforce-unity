@@ -14,6 +14,22 @@ interface Project {
   time_recording_mode?: 'hours' | 'start_end' | null
 }
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
+interface ProjectData {
+  id: string
+  name: string
+  code: string | null
+  time_recording_mode?: 'hours' | 'start_end' | null
+}
+
+interface AssignmentWithProject {
+  project: ProjectData | null
+}
+
 export default function NewTimeEntryPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -35,7 +51,7 @@ export default function NewTimeEntryPage() {
 
   // Get selected project
   const selectedProject = useMemo(() => {
-    return projects.find(p => p.id === projectId)
+    return projects.find((p) => p.id === projectId)
   }, [projects, projectId])
 
   const timeMode = selectedProject?.time_recording_mode || 'hours'
@@ -63,12 +79,14 @@ export default function NewTimeEntryPage() {
       if (!userData.user) return
 
       // Check if user is superadmin
-      const { data: membership } = await supabase
+      const { data: membershipData } = await supabase
         .from('company_members')
         .select('company_id, role')
         .eq('user_id', userData.user.id)
         .eq('is_active', true)
         .single()
+
+      const membership = membershipData as CompanyMembership | null
 
       if (!membership) {
         setProjects([])
@@ -96,23 +114,27 @@ export default function NewTimeEntryPage() {
             .eq('is_active', true)
             .order('name')
 
-          projectList = (fallbackProjects || []).map(p => ({
+          const fallbackData = (fallbackProjects || []) as ProjectData[]
+          projectList = fallbackData.map((p) => ({
             ...p,
-            time_recording_mode: 'hours' as const
+            time_recording_mode: 'hours' as const,
           }))
         } else {
-          projectList = (allProjects || []).map(p => ({
+          const projectsData = (allProjects || []) as ProjectData[]
+          projectList = projectsData.map((p) => ({
             ...p,
-            time_recording_mode: (p as any).time_recording_mode || 'hours'
+            time_recording_mode: p.time_recording_mode || 'hours',
           }))
         }
       } else {
         // Regular users: get assigned projects
         const { data: assignments, error: assignError } = await supabase
           .from('project_assignments')
-          .select(`
+          .select(
+            `
             project:projects(id, name, code, time_recording_mode)
-          `)
+          `
+          )
           .eq('user_id', userData.user.id)
           .eq('is_active', true)
 
@@ -121,31 +143,37 @@ export default function NewTimeEntryPage() {
           console.warn('Error fetching with time_recording_mode, trying fallback:', assignError)
           const { data: fallbackAssignments } = await supabase
             .from('project_assignments')
-            .select(`
+            .select(
+              `
               project:projects(id, name, code)
-            `)
+            `
+            )
             .eq('user_id', userData.user.id)
             .eq('is_active', true)
 
-          if (fallbackAssignments) {
-            projectList = fallbackAssignments
-              .map(a => {
-                const proj = a.project as any
-                return proj ? {
-                  ...proj,
-                  time_recording_mode: 'hours' as const
-                } : null
-              })
-              .filter(Boolean) as Project[]
-          }
-        } else if (assignments) {
-          projectList = assignments
-            .map(a => {
-              const proj = a.project as any
-              return proj ? {
-                ...proj,
-                time_recording_mode: proj.time_recording_mode || 'hours'
-              } : null
+          const fallbackData = (fallbackAssignments || []) as AssignmentWithProject[]
+          projectList = fallbackData
+            .map((a) => {
+              const proj = a.project
+              return proj
+                ? {
+                    ...proj,
+                    time_recording_mode: 'hours' as const,
+                  }
+                : null
+            })
+            .filter(Boolean) as Project[]
+        } else {
+          const assignmentsData = (assignments || []) as AssignmentWithProject[]
+          projectList = assignmentsData
+            .map((a) => {
+              const proj = a.project
+              return proj
+                ? {
+                    ...proj,
+                    time_recording_mode: proj.time_recording_mode || 'hours',
+                  }
+                : null
             })
             .filter(Boolean) as Project[]
         }
@@ -193,17 +221,16 @@ export default function NewTimeEntryPage() {
     border: '1px solid rgba(255, 255, 255, 0.12)',
   }
 
-  const isFormValid = projectId && (
-    timeMode === 'hours' ? hours : (calculatedHours && calculatedHours > 0)
-  )
+  const isFormValid =
+    projectId && (timeMode === 'hours' ? hours : calculatedHours && calculatedHours > 0)
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       {/* Header */}
       <div>
         <Link
           href="/timesheets"
-          className="inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white mb-4"
+          className="mb-4 inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Timesheets
@@ -217,7 +244,7 @@ export default function NewTimeEntryPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div
-          className="p-6 rounded-[18px] space-y-5"
+          className="space-y-5 rounded-[18px] p-6"
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -225,14 +252,14 @@ export default function NewTimeEntryPage() {
         >
           {/* Project */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Project *
             </label>
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
               required
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none"
+              className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none"
               style={inputStyle}
             >
               <option value="">Select a project</option>
@@ -249,14 +276,15 @@ export default function NewTimeEntryPage() {
             )}
             {selectedProject && (
               <p className="mt-2 text-[11px] text-[rgba(232,236,255,0.5)]">
-                Time recording: {timeMode === 'hours' ? 'Direct hours entry' : 'Start/end time with break'}
+                Time recording:{' '}
+                {timeMode === 'hours' ? 'Direct hours entry' : 'Start/end time with break'}
               </p>
             )}
           </div>
 
           {/* Date */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Date *
             </label>
             <input
@@ -264,7 +292,7 @@ export default function NewTimeEntryPage() {
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none"
+              className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none"
               style={inputStyle}
             />
           </div>
@@ -273,7 +301,7 @@ export default function NewTimeEntryPage() {
           {timeMode === 'hours' ? (
             // Direct Hours Entry
             <div>
-              <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                 Hours *
               </label>
               <input
@@ -285,7 +313,7 @@ export default function NewTimeEntryPage() {
                 value={hours}
                 onChange={(e) => setHours(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
+                className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
                 style={inputStyle}
               />
             </div>
@@ -294,7 +322,7 @@ export default function NewTimeEntryPage() {
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                     Start Time *
                   </label>
                   <input
@@ -302,12 +330,12 @@ export default function NewTimeEntryPage() {
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
                     required
-                    className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none"
+                    className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none"
                     style={inputStyle}
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                     End Time *
                   </label>
                   <input
@@ -315,14 +343,14 @@ export default function NewTimeEntryPage() {
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
                     required
-                    className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] focus:outline-none"
+                    className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] focus:outline-none"
                     style={inputStyle}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
                   Break (minutes)
                 </label>
                 <input
@@ -333,27 +361,29 @@ export default function NewTimeEntryPage() {
                   placeholder="30"
                   value={breakMinutes}
                   onChange={(e) => setBreakMinutes(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
+                  className="w-full rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
                   style={inputStyle}
                 />
               </div>
 
               {/* Calculated Hours Display */}
               <div
-                className="p-3 rounded-[12px]"
+                className="rounded-[12px] p-3"
                 style={{
                   background: 'rgba(31, 91, 255, 0.1)',
                   border: '1px solid rgba(31, 91, 255, 0.3)',
                 }}
               >
-                <div className="flex justify-between items-center">
-                  <span className="text-[12px] text-[rgba(232,236,255,0.7)]">Calculated working hours:</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-[rgba(232,236,255,0.7)]">
+                    Calculated working hours:
+                  </span>
                   <span className="text-[16px] font-bold text-white">
                     {calculatedHours ? `${calculatedHours} h` : '—'}
                   </span>
                 </div>
                 {calculatedHours && calculatedHours <= 0 && (
-                  <p className="text-[11px] text-[#f87171] mt-1">
+                  <p className="mt-1 text-[11px] text-[#f87171]">
                     End time must be after start time (minus break)
                   </p>
                 )}
@@ -363,7 +393,7 @@ export default function NewTimeEntryPage() {
 
           {/* Description */}
           <div>
-            <label className="block text-[11px] font-semibold text-[rgba(232,236,255,0.68)] uppercase tracking-wide mb-2">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[rgba(232,236,255,0.68)]">
               Description
             </label>
             <textarea
@@ -371,7 +401,7 @@ export default function NewTimeEntryPage() {
               placeholder="What did you work on?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-[12px] text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none resize-none"
+              className="w-full resize-none rounded-[12px] px-3 py-2.5 text-[13px] text-[#e8ecff] placeholder:text-[rgba(232,236,255,0.4)] focus:outline-none"
               style={inputStyle}
             />
           </div>
@@ -393,7 +423,7 @@ export default function NewTimeEntryPage() {
 
         {error && (
           <div
-            className="text-[13px] p-3 rounded-[10px]"
+            className="rounded-[10px] p-3 text-[13px]"
             style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
@@ -409,7 +439,7 @@ export default function NewTimeEntryPage() {
           <button
             type="submit"
             disabled={loading || !isFormValid}
-            className="px-5 py-2.5 rounded-[12px] text-[13px] font-semibold text-white disabled:opacity-50"
+            className="rounded-[12px] px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
             style={{ background: '#1f5bff' }}
           >
             {loading ? 'Saving...' : 'Save Entry'}
@@ -417,7 +447,7 @@ export default function NewTimeEntryPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-5 py-2.5 rounded-[12px] text-[13px] text-[rgba(255,255,255,0.6)]"
+            className="rounded-[12px] px-5 py-2.5 text-[13px] text-[rgba(255,255,255,0.6)]"
           >
             Cancel
           </button>

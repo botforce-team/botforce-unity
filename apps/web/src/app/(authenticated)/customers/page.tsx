@@ -2,23 +2,51 @@ import { createClient } from '@/lib/supabase/server'
 import { Plus, Building2, Mail, Phone, MapPin } from 'lucide-react'
 import Link from 'next/link'
 
+interface CompanyMembership {
+  company_id: string
+  role: string
+}
+
+interface CustomerWithProjects {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  address_line1: string | null
+  city: string | null
+  country: string | null
+  vat_number: string | null
+  is_active?: boolean
+  projects: { count: number }[]
+}
+
+interface InvoiceTotal {
+  customer_id: string
+  total: number
+  status: string
+}
+
 export default async function CustomersPage() {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // Get user's company membership
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
+  const membership = membershipData as CompanyMembership | null
+
   if (!membership) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
       </div>
     )
@@ -28,26 +56,32 @@ export default async function CustomersPage() {
   const isAdmin = role === 'superadmin'
 
   // Fetch customers with project counts
-  const { data: customers } = await supabase
+  const { data: customersData } = await supabase
     .from('customers')
-    .select(`
+    .select(
+      `
       *,
       projects:projects(count)
-    `)
+    `
+    )
     .eq('company_id', company_id)
     .order('name', { ascending: true })
 
+  const customers = (customersData || []) as CustomerWithProjects[]
+
   // Get invoice totals per customer
-  const { data: invoiceTotals } = await supabase
+  const { data: invoiceTotalsData } = await supabase
     .from('documents')
     .select('customer_id, total, status')
     .eq('company_id', company_id)
     .eq('document_type', 'invoice')
     .in('status', ['issued', 'paid'])
 
+  const invoiceTotals = (invoiceTotalsData || []) as InvoiceTotal[]
+
   // Calculate totals per customer
   const customerStats: Record<string, { total: number; unpaid: number }> = {}
-  invoiceTotals?.forEach(inv => {
+  invoiceTotals.forEach((inv) => {
     if (!customerStats[inv.customer_id]) {
       customerStats[inv.customer_id] = { total: 0, unpaid: 0 }
     }
@@ -81,7 +115,7 @@ export default async function CustomersPage() {
         {isAdmin && (
           <Link
             href="/customers/new"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-[13px] font-semibold text-white"
+            className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-semibold text-white"
             style={{ background: '#1f5bff' }}
           >
             <Plus className="h-4 w-4" />
@@ -92,17 +126,17 @@ export default async function CustomersPage() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-white">{customers?.length || 0}</div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Total Customers</p>
         </div>
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-white">
-            {customers?.filter(c => c.is_active !== false).length || 0}
+            {customers?.filter((c) => c.is_active !== false).length || 0}
           </div>
           <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Active</p>
         </div>
-        <div className="p-5 rounded-[18px]" style={cardStyle}>
+        <div className="rounded-[18px] p-5" style={cardStyle}>
           <div className="text-2xl font-bold text-[#f59e0b]">
             {formatCurrency(Object.values(customerStats).reduce((sum, s) => sum + s.unpaid, 0))}
           </div>
@@ -112,12 +146,9 @@ export default async function CustomersPage() {
 
       {/* Customers List */}
       {!customers || customers.length === 0 ? (
-        <div
-          className="py-12 rounded-[18px] text-center"
-          style={cardStyle}
-        >
-          <Building2 className="h-12 w-12 mx-auto text-[rgba(232,236,255,0.3)] mb-4" />
-          <p className="text-[rgba(232,236,255,0.6)] text-[14px]">
+        <div className="rounded-[18px] py-12 text-center" style={cardStyle}>
+          <Building2 className="mx-auto mb-4 h-12 w-12 text-[rgba(232,236,255,0.3)]" />
+          <p className="text-[14px] text-[rgba(232,236,255,0.6)]">
             No customers yet.
             {isAdmin && ' Add your first customer to get started.'}
           </p>
@@ -131,13 +162,13 @@ export default async function CustomersPage() {
             return (
               <Link key={customer.id} href={`/customers/${customer.id}`}>
                 <div
-                  className="p-5 rounded-[18px] h-full transition-all hover:border-[rgba(255,255,255,0.2)]"
+                  className="h-full rounded-[18px] p-5 transition-all hover:border-[rgba(255,255,255,0.2)]"
                   style={cardStyle}
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="mb-3 flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div
-                        className="h-10 w-10 rounded-full flex items-center justify-center"
+                        className="flex h-10 w-10 items-center justify-center rounded-full"
                         style={{
                           background: 'rgba(139, 92, 246, 0.15)',
                           border: '1px solid rgba(139, 92, 246, 0.3)',
@@ -158,7 +189,7 @@ export default async function CustomersPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 mb-4">
+                  <div className="mb-4 space-y-2">
                     {customer.email && (
                       <div className="flex items-center gap-2 text-[12px] text-[rgba(232,236,255,0.6)]">
                         <Mail className="h-3.5 w-3.5" />
@@ -180,18 +211,18 @@ export default async function CustomersPage() {
                   </div>
 
                   <div
-                    className="pt-3 flex items-center justify-between text-[12px]"
+                    className="flex items-center justify-between pt-3 text-[12px]"
                     style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}
                   >
                     <span className="text-[rgba(232,236,255,0.5)]">
                       {projectCount} project{projectCount !== 1 ? 's' : ''}
                     </span>
                     {stats.unpaid > 0 ? (
-                      <span className="text-[#f59e0b] font-medium">
+                      <span className="font-medium text-[#f59e0b]">
                         {formatCurrency(stats.unpaid)} unpaid
                       </span>
                     ) : stats.total > 0 ? (
-                      <span className="text-[#22c55e] font-medium">
+                      <span className="font-medium text-[#22c55e]">
                         {formatCurrency(stats.total)} total
                       </span>
                     ) : (
