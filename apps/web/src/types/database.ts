@@ -1,10 +1,4 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type UserRole = 'superadmin' | 'employee' | 'accountant'
 export type TimeEntryStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'invoiced'
@@ -14,6 +8,7 @@ export type BillingType = 'hourly' | 'fixed'
 export type TaxRate = 'standard_20' | 'reduced_10' | 'zero'
 export type ExpenseStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'exported'
 export type ExportStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
 
 export interface Database {
   public: {
@@ -159,6 +154,7 @@ export interface Database {
           customer_number: string | null
           vat_number: string | null
           tax_exempt: boolean
+          reverse_charge: boolean
           email: string | null
           phone: string | null
           website: string | null
@@ -183,6 +179,7 @@ export interface Database {
           customer_number?: string | null
           vat_number?: string | null
           tax_exempt?: boolean
+          reverse_charge?: boolean
           email?: string | null
           phone?: string | null
           website?: string | null
@@ -207,6 +204,7 @@ export interface Database {
           customer_number?: string | null
           vat_number?: string | null
           tax_exempt?: boolean
+          reverse_charge?: boolean
           email?: string | null
           phone?: string | null
           website?: string | null
@@ -786,6 +784,119 @@ export interface Database {
           ip_address?: string | null
           user_agent?: string | null
           created_at?: string
+        }
+      }
+      recurring_invoice_templates: {
+        Row: {
+          id: string
+          company_id: string
+          customer_id: string
+          name: string
+          description: string | null
+          frequency: RecurrenceFrequency
+          day_of_month: number | null
+          day_of_week: number | null
+          payment_terms_days: number
+          notes: string | null
+          is_active: boolean
+          next_issue_date: string | null
+          last_issued_at: string | null
+          subtotal: number
+          tax_amount: number
+          total: number
+          currency: string
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          customer_id: string
+          name: string
+          description?: string | null
+          frequency?: RecurrenceFrequency
+          day_of_month?: number | null
+          day_of_week?: number | null
+          payment_terms_days?: number
+          notes?: string | null
+          is_active?: boolean
+          next_issue_date?: string | null
+          last_issued_at?: string | null
+          subtotal?: number
+          tax_amount?: number
+          total?: number
+          currency?: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          customer_id?: string
+          name?: string
+          description?: string | null
+          frequency?: RecurrenceFrequency
+          day_of_month?: number | null
+          day_of_week?: number | null
+          payment_terms_days?: number
+          notes?: string | null
+          is_active?: boolean
+          next_issue_date?: string | null
+          last_issued_at?: string | null
+          subtotal?: number
+          tax_amount?: number
+          total?: number
+          currency?: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+      }
+      recurring_invoice_lines: {
+        Row: {
+          id: string
+          company_id: string
+          template_id: string
+          line_number: number
+          description: string
+          quantity: number
+          unit: string
+          unit_price: number
+          tax_rate: TaxRate
+          subtotal: number
+          project_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          template_id: string
+          line_number: number
+          description: string
+          quantity?: number
+          unit?: string
+          unit_price: number
+          tax_rate?: TaxRate
+          project_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          template_id?: string
+          line_number?: number
+          description?: string
+          quantity?: number
+          unit?: string
+          unit_price?: number
+          tax_rate?: TaxRate
+          project_id?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
     }

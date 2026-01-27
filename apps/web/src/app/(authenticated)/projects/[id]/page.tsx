@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft, Clock, Users, DollarSign, Pencil } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { DeleteProjectButton, ArchiveProjectButton } from './actions'
+import { ManageTeamDialog } from '@/components/projects/manage-team-dialog'
 
 interface CompanyMembership {
   company_id: string
@@ -30,7 +31,8 @@ interface TimeEntryData {
 
 interface AssignmentWithProfile {
   id: string
-  hourly_rate: number | null
+  user_id: string
+  hourly_rate_override: number | null
   profile: { id: string; email: string; first_name: string | null; last_name: string | null } | null
 }
 
@@ -98,7 +100,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     .from('project_assignments')
     .select(
       `
-      *,
+      id,
+      user_id,
+      hourly_rate_override,
       profile:profiles(id, email, first_name, last_name)
     `
     )
@@ -313,9 +317,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                       </p>
                     </div>
                   </div>
-                  {assignment.hourly_rate && (
+                  {assignment.hourly_rate_override && (
                     <span className="text-[12px] text-[rgba(232,236,255,0.6)]">
-                      {formatCurrency(assignment.hourly_rate)}/hr
+                      {formatCurrency(assignment.hourly_rate_override)}/hr
                     </span>
                   )}
                 </div>
@@ -345,6 +349,12 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           >
             Create Invoice
           </Link>
+          <ManageTeamDialog
+            projectId={project.id}
+            projectName={project.name}
+            projectRate={project.hourly_rate}
+            currentAssignments={assignments}
+          />
           <Link
             href={`/projects/${project.id}/edit`}
             className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-medium text-[rgba(255,255,255,0.8)] transition-all"

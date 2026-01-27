@@ -462,6 +462,7 @@ export async function generateDocumentPDF(id: string) {
     taxBreakdown: (document.tax_breakdown as Record<string, { base: number; tax: number }>) || {},
     notes: document.notes || undefined,
     paymentNotes: document.payment_notes || undefined,
+    reverseCharge: document.customer.reverse_charge === true,
   }
 
   try {

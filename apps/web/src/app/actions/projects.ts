@@ -25,7 +25,9 @@ const projectSchema = z.object({
 export async function createProject(formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -48,12 +50,18 @@ export async function createProject(formData: FormData) {
   const rawData = {
     customer_id: formData.get('customer_id') as string,
     name: formData.get('name') as string,
-    code: formData.get('code') as string || undefined,
-    description: formData.get('description') as string || undefined,
+    code: (formData.get('code') as string) || undefined,
+    description: (formData.get('description') as string) || undefined,
     billing_type: formData.get('billing_type') as 'hourly' | 'fixed',
-    hourly_rate: formData.get('hourly_rate') ? parseFloat(formData.get('hourly_rate') as string) : undefined,
-    fixed_price: formData.get('fixed_price') ? parseFloat(formData.get('fixed_price') as string) : undefined,
-    budget_hours: formData.get('budget_hours') ? parseFloat(formData.get('budget_hours') as string) : undefined,
+    hourly_rate: formData.get('hourly_rate')
+      ? parseFloat(formData.get('hourly_rate') as string)
+      : undefined,
+    fixed_price: formData.get('fixed_price')
+      ? parseFloat(formData.get('fixed_price') as string)
+      : undefined,
+    budget_hours: formData.get('budget_hours')
+      ? parseFloat(formData.get('budget_hours') as string)
+      : undefined,
     time_recording_mode: (formData.get('time_recording_mode') as 'hours' | 'start_end') || 'hours',
     is_active: formData.get('is_active') !== 'false',
   }
@@ -84,7 +92,9 @@ export async function createProject(formData: FormData) {
 export async function updateProject(id: string, formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -93,12 +103,18 @@ export async function updateProject(id: string, formData: FormData) {
   const rawData = {
     customer_id: formData.get('customer_id') as string,
     name: formData.get('name') as string,
-    code: formData.get('code') as string || undefined,
-    description: formData.get('description') as string || undefined,
+    code: (formData.get('code') as string) || undefined,
+    description: (formData.get('description') as string) || undefined,
     billing_type: formData.get('billing_type') as 'hourly' | 'fixed',
-    hourly_rate: formData.get('hourly_rate') ? parseFloat(formData.get('hourly_rate') as string) : undefined,
-    fixed_price: formData.get('fixed_price') ? parseFloat(formData.get('fixed_price') as string) : undefined,
-    budget_hours: formData.get('budget_hours') ? parseFloat(formData.get('budget_hours') as string) : undefined,
+    hourly_rate: formData.get('hourly_rate')
+      ? parseFloat(formData.get('hourly_rate') as string)
+      : undefined,
+    fixed_price: formData.get('fixed_price')
+      ? parseFloat(formData.get('fixed_price') as string)
+      : undefined,
+    budget_hours: formData.get('budget_hours')
+      ? parseFloat(formData.get('budget_hours') as string)
+      : undefined,
     time_recording_mode: (formData.get('time_recording_mode') as 'hours' | 'start_end') || 'hours',
     is_active: formData.get('is_active') !== 'false',
   }
@@ -128,7 +144,9 @@ export async function updateProject(id: string, formData: FormData) {
 export async function createCustomer(formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -147,24 +165,52 @@ export async function createCustomer(formData: FormData) {
     return { error: 'Only admins can create customers' }
   }
 
-  const country = formData.get('country') as string || 'AT'
+  const country = (formData.get('country') as string) || 'AT'
   // Auto-enable reverse charge for EU countries outside Austria
-  const euCountries = ['DE', 'FR', 'IT', 'NL', 'BE', 'ES', 'PT', 'PL', 'CZ', 'HU', 'SK', 'SI', 'HR', 'RO', 'BG', 'GR', 'IE', 'DK', 'SE', 'FI', 'EE', 'LV', 'LT', 'LU', 'MT', 'CY']
+  const euCountries = [
+    'DE',
+    'FR',
+    'IT',
+    'NL',
+    'BE',
+    'ES',
+    'PT',
+    'PL',
+    'CZ',
+    'HU',
+    'SK',
+    'SI',
+    'HR',
+    'RO',
+    'BG',
+    'GR',
+    'IE',
+    'DK',
+    'SE',
+    'FI',
+    'EE',
+    'LV',
+    'LT',
+    'LU',
+    'MT',
+    'CY',
+  ]
   const reverseChargeValue = formData.get('reverse_charge')
-  const reverseCharge = reverseChargeValue === 'true' || (reverseChargeValue === null && euCountries.includes(country))
+  const reverseCharge =
+    reverseChargeValue === 'true' || (reverseChargeValue === null && euCountries.includes(country))
 
   const { data, error } = await supabase
     .from('customers')
     .insert({
       company_id: membership.company_id,
       name: formData.get('name') as string,
-      email: formData.get('email') as string || null,
-      phone: formData.get('phone') as string || null,
-      vat_number: formData.get('vat_number') as string || null,
-      address_line1: formData.get('address_line1') as string || null,
-      address_line2: formData.get('address_line2') as string || null,
-      city: formData.get('city') as string || null,
-      postal_code: formData.get('postal_code') as string || null,
+      email: (formData.get('email') as string) || null,
+      phone: (formData.get('phone') as string) || null,
+      vat_number: (formData.get('vat_number') as string) || null,
+      address_line1: (formData.get('address_line1') as string) || null,
+      address_line2: (formData.get('address_line2') as string) || null,
+      city: (formData.get('city') as string) || null,
+      postal_code: (formData.get('postal_code') as string) || null,
       country: country,
       reverse_charge: reverseCharge,
     } as never)
@@ -184,7 +230,9 @@ export async function createCustomer(formData: FormData) {
 export async function updateCustomer(id: string, formData: FormData) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -206,14 +254,14 @@ export async function updateCustomer(id: string, formData: FormData) {
     .from('customers')
     .update({
       name: formData.get('name') as string,
-      email: formData.get('email') as string || null,
-      phone: formData.get('phone') as string || null,
-      vat_number: formData.get('vat_number') as string || null,
-      address_line1: formData.get('address_line1') as string || null,
-      address_line2: formData.get('address_line2') as string || null,
-      city: formData.get('city') as string || null,
-      postal_code: formData.get('postal_code') as string || null,
-      country: formData.get('country') as string || 'AT',
+      email: (formData.get('email') as string) || null,
+      phone: (formData.get('phone') as string) || null,
+      vat_number: (formData.get('vat_number') as string) || null,
+      address_line1: (formData.get('address_line1') as string) || null,
+      address_line2: (formData.get('address_line2') as string) || null,
+      city: (formData.get('city') as string) || null,
+      postal_code: (formData.get('postal_code') as string) || null,
+      country: (formData.get('country') as string) || 'AT',
       reverse_charge: formData.get('reverse_charge') === 'true',
     } as never)
     .eq('id', id)
@@ -234,7 +282,9 @@ export async function updateCustomer(id: string, formData: FormData) {
 export async function archiveProject(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -273,7 +323,9 @@ export async function archiveProject(id: string) {
 export async function deleteProject(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -298,7 +350,9 @@ export async function deleteProject(id: string) {
     .eq('project_id', id)
 
   if (timeEntryCount && timeEntryCount > 0) {
-    return { error: `Cannot delete project with ${timeEntryCount} time entries. Archive the project instead.` }
+    return {
+      error: `Cannot delete project with ${timeEntryCount} time entries. Archive the project instead.`,
+    }
   }
 
   // Check if project has expenses
@@ -308,7 +362,9 @@ export async function deleteProject(id: string) {
     .eq('project_id', id)
 
   if (expenseCount && expenseCount > 0) {
-    return { error: `Cannot delete project with ${expenseCount} expenses. Archive the project instead.` }
+    return {
+      error: `Cannot delete project with ${expenseCount} expenses. Archive the project instead.`,
+    }
   }
 
   // Check if project appears on any invoice lines
@@ -340,7 +396,9 @@ export async function deleteProject(id: string) {
 export async function deleteCustomer(id: string) {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -365,7 +423,9 @@ export async function deleteCustomer(id: string) {
     .eq('customer_id', id)
 
   if (projectCount && projectCount > 0) {
-    return { error: 'Cannot delete customer with existing projects. Delete or reassign projects first.' }
+    return {
+      error: 'Cannot delete customer with existing projects. Delete or reassign projects first.',
+    }
   }
 
   // Check if customer has invoices
@@ -390,5 +450,241 @@ export async function deleteCustomer(id: string) {
   }
 
   revalidatePath('/customers')
+  return { success: true }
+}
+
+// ============================================================
+// Project Assignment Management
+// ============================================================
+
+export async function getAvailableTeamMembers(projectId: string) {
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: membershipData } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  const membership = membershipData as CompanyMembership | null
+
+  if (!membership || membership.role !== 'superadmin') {
+    return { error: 'Only admins can manage project assignments' }
+  }
+
+  // Get all active team members (employees and superadmins)
+  const { data: allMembers, error: membersError } = await supabase
+    .from('company_members')
+    .select(
+      `
+      user_id,
+      role,
+      hourly_rate,
+      profile:profiles(id, email, first_name, last_name)
+    `
+    )
+    .eq('company_id', membership.company_id)
+    .eq('is_active', true)
+    .in('role', ['superadmin', 'employee'])
+
+  if (membersError) {
+    return { error: membersError.message }
+  }
+
+  // Get currently assigned members
+  const { data: assignedData } = await supabase
+    .from('project_assignments')
+    .select('user_id')
+    .eq('project_id', projectId)
+    .eq('is_active', true)
+
+  const assignedUserIds = new Set((assignedData || []).map((a) => a.user_id))
+
+  // Filter out already assigned members
+  const availableMembers = (allMembers || []).filter((m) => !assignedUserIds.has(m.user_id))
+
+  return { data: availableMembers }
+}
+
+export async function assignMemberToProject(
+  projectId: string,
+  userId: string,
+  hourlyRateOverride?: number
+) {
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: membershipData } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  const membership = membershipData as CompanyMembership | null
+
+  if (!membership || membership.role !== 'superadmin') {
+    return { error: 'Only admins can assign team members' }
+  }
+
+  // Verify project belongs to company
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('id', projectId)
+    .eq('company_id', membership.company_id)
+    .single()
+
+  if (!project) {
+    return { error: 'Project not found' }
+  }
+
+  // Verify user is a team member
+  const { data: targetMember } = await supabase
+    .from('company_members')
+    .select('user_id')
+    .eq('user_id', userId)
+    .eq('company_id', membership.company_id)
+    .eq('is_active', true)
+    .single()
+
+  if (!targetMember) {
+    return { error: 'Team member not found' }
+  }
+
+  // Check if assignment already exists (even if inactive)
+  const { data: existingAssignment } = await supabase
+    .from('project_assignments')
+    .select('id, is_active')
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .single()
+
+  if (existingAssignment) {
+    if (existingAssignment.is_active) {
+      return { error: 'Member is already assigned to this project' }
+    }
+    // Reactivate existing assignment
+    const { error: updateError } = await supabase
+      .from('project_assignments')
+      .update({
+        is_active: true,
+        hourly_rate_override: hourlyRateOverride || null,
+      } as never)
+      .eq('id', existingAssignment.id)
+
+    if (updateError) {
+      return { error: updateError.message }
+    }
+  } else {
+    // Create new assignment
+    const { error: insertError } = await supabase.from('project_assignments').insert({
+      company_id: membership.company_id,
+      project_id: projectId,
+      user_id: userId,
+      hourly_rate_override: hourlyRateOverride || null,
+      is_active: true,
+    } as never)
+
+    if (insertError) {
+      return { error: insertError.message }
+    }
+  }
+
+  revalidatePath(`/projects/${projectId}`)
+  return { success: true }
+}
+
+export async function removeMemberFromProject(projectId: string, userId: string) {
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: membershipData } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  const membership = membershipData as CompanyMembership | null
+
+  if (!membership || membership.role !== 'superadmin') {
+    return { error: 'Only admins can remove team members from projects' }
+  }
+
+  // Soft delete: set is_active to false (preserves historical data for time entries)
+  const { error } = await supabase
+    .from('project_assignments')
+    .update({ is_active: false } as never)
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath(`/projects/${projectId}`)
+  return { success: true }
+}
+
+export async function updateAssignmentRate(
+  projectId: string,
+  userId: string,
+  hourlyRateOverride: number | null
+) {
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: membershipData } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  const membership = membershipData as CompanyMembership | null
+
+  if (!membership || membership.role !== 'superadmin') {
+    return { error: 'Only admins can update assignment rates' }
+  }
+
+  const { error } = await supabase
+    .from('project_assignments')
+    .update({ hourly_rate_override: hourlyRateOverride } as never)
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath(`/projects/${projectId}`)
   return { success: true }
 }

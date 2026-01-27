@@ -88,6 +88,9 @@ export interface InvoiceData {
   // Notes
   notes?: string
   paymentNotes?: string
+
+  // Reverse charge (EU B2B)
+  reverseCharge?: boolean
 }
 
 function formatTaxRate(taxRate: string): string {
@@ -238,7 +241,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
   yPos = Math.max(custY, detailY) + 15
 
   const tableHeaders = [['#', 'Description', 'Qty', 'Unit', 'Unit Price', 'Tax', 'Amount']]
-  const tableBody = data.lines.map(line => [
+  const tableBody = data.lines.map((line) => [
     line.lineNumber.toString(),
     line.description,
     line.quantity.toString(),
@@ -288,7 +291,11 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
 
     for (const [rate, amounts] of Object.entries(data.taxBreakdown)) {
       const rateLabel = formatTaxRate(rate)
-      doc.text(`${rateLabel}: Base ${formatCurrency(amounts.base, data.currency)} | Tax ${formatCurrency(amounts.tax, data.currency)}`, margin + 5, yPos)
+      doc.text(
+        `${rateLabel}: Base ${formatCurrency(amounts.base, data.currency)} | Tax ${formatCurrency(amounts.tax, data.currency)}`,
+        margin + 5,
+        yPos
+      )
       yPos += 4
     }
     yPos += 5
@@ -299,14 +306,18 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
   doc.setTextColor(...grayColor)
   doc.text('Subtotal:', totalsX, yPos)
   doc.setTextColor(...textColor)
-  doc.text(formatCurrency(data.subtotal, data.currency), pageWidth - margin, yPos, { align: 'right' })
+  doc.text(formatCurrency(data.subtotal, data.currency), pageWidth - margin, yPos, {
+    align: 'right',
+  })
   yPos += 6
 
   // Tax
   doc.setTextColor(...grayColor)
   doc.text('Tax:', totalsX, yPos)
   doc.setTextColor(...textColor)
-  doc.text(formatCurrency(data.taxAmount, data.currency), pageWidth - margin, yPos, { align: 'right' })
+  doc.text(formatCurrency(data.taxAmount, data.currency), pageWidth - margin, yPos, {
+    align: 'right',
+  })
   yPos += 6
 
   // Total
@@ -318,6 +329,25 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
   doc.setTextColor(...primaryColor)
   doc.text('Total:', totalsX, yPos)
   doc.text(formatCurrency(data.total, data.currency), pageWidth - margin, yPos, { align: 'right' })
+
+  // Reverse charge notice (EU B2B)
+  if (data.reverseCharge) {
+    yPos += 12
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(180, 83, 9) // Warning orange color
+    doc.text('REVERSE CHARGE', margin, yPos)
+    yPos += 5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...textColor)
+    const reverseChargeNotice =
+      'VAT reverse charge: The recipient of the service is liable for VAT. ' +
+      'Steuerschuldnerschaft des Leistungsempfängers gem. Art. 196 Richtlinie 2006/112/EG.'
+    const splitNotice = doc.splitTextToSize(reverseChargeNotice, pageWidth - 2 * margin)
+    doc.text(splitNotice, margin, yPos)
+    yPos += splitNotice.length * 4
+  }
 
   // Notes section
   yPos += 15

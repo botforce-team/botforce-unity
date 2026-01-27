@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { Plus, FileText, Download } from 'lucide-react'
+import { Plus, FileText, Download, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
@@ -128,14 +128,27 @@ export default async function DocumentsPage() {
           </p>
         </div>
         {isAdmin && (
-          <Link
-            href="/documents/new"
-            className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-semibold text-white"
-            style={{ background: '#1f5bff' }}
-          >
-            <Plus className="h-4 w-4" />
-            New Invoice
-          </Link>
+          <div className="flex gap-3">
+            <Link
+              href="/documents/recurring"
+              className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-medium text-[rgba(255,255,255,0.8)]"
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Recurring
+            </Link>
+            <Link
+              href="/documents/new"
+              className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-semibold text-white"
+              style={{ background: '#1f5bff' }}
+            >
+              <Plus className="h-4 w-4" />
+              New Invoice
+            </Link>
+          </div>
         )}
       </div>
 

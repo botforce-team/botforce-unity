@@ -1,7 +1,16 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { addDays, addWeeks, startOfWeek, endOfWeek, format, differenceInDays, startOfMonth, endOfMonth } from 'date-fns'
+import {
+  addDays,
+  addWeeks,
+  startOfWeek,
+  endOfWeek,
+  format,
+  differenceInDays,
+  startOfMonth,
+  endOfMonth,
+} from 'date-fns'
 import { revalidatePath } from 'next/cache'
 import JSZip from 'jszip'
 import { generateInvoicePDF, type InvoiceData } from '@/lib/pdf/invoice-generator'
@@ -73,10 +82,15 @@ export interface RecurringCost {
   dayOfMonth?: number
 }
 
-export async function getFinancialSummary(startingCashBalance: number = 0, recurringCosts: RecurringCost[] = []): Promise<{ data?: FinancialSummary; error?: string }> {
+export async function getFinancialSummary(
+  startingCashBalance: number = 0,
+  recurringCosts: RecurringCost[] = []
+): Promise<{ data?: FinancialSummary; error?: string }> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -101,7 +115,8 @@ export async function getFinancialSummary(startingCashBalance: number = 0, recur
   // Fetch unpaid invoices (AR)
   const { data: unpaidInvoicesData } = await supabase
     .from('documents')
-    .select(`
+    .select(
+      `
       id,
       document_number,
       total,
@@ -109,13 +124,24 @@ export async function getFinancialSummary(startingCashBalance: number = 0, recur
       issue_date,
       status,
       customer:customers(name)
-    `)
+    `
+    )
     .eq('company_id', membership.company_id)
     .eq('document_type', 'invoice')
     .eq('status', 'issued')
     .order('due_date', { ascending: true })
 
-  const unpaidInvoices = unpaidInvoicesData as { id: string; document_number: string | null; total: number; due_date: string | null; issue_date: string | null; status: string; customer: { name: string } | null }[] | null
+  const unpaidInvoices = unpaidInvoicesData as
+    | {
+        id: string
+        document_number: string | null
+        total: number
+        due_date: string | null
+        issue_date: string | null
+        status: string
+        customer: { name: string } | null
+      }[]
+    | null
 
   // Fetch paid invoices this month
   const { data: paidInvoicesData } = await supabase
@@ -131,21 +157,32 @@ export async function getFinancialSummary(startingCashBalance: number = 0, recur
   // Fetch pending expense reimbursements (AP)
   const { data: pendingExpensesData } = await supabase
     .from('expenses')
-    .select(`
+    .select(
+      `
       id,
       amount,
       category,
       description,
       date,
       profile:profiles(first_name, last_name, email)
-    `)
+    `
+    )
     .eq('company_id', membership.company_id)
     .eq('status', 'approved')
     .eq('is_reimbursable', true)
     .is('reimbursed_at', null)
     .order('date', { ascending: false })
 
-  const pendingExpenses = pendingExpensesData as { id: string; amount: number; category: string; description: string | null; date: string; profile: { first_name: string | null; last_name: string | null; email: string } | null }[] | null
+  const pendingExpenses = pendingExpensesData as
+    | {
+        id: string
+        amount: number
+        category: string
+        description: string | null
+        date: string
+        profile: { first_name: string | null; last_name: string | null; email: string } | null
+      }[]
+    | null
 
   // Fetch expenses this month (all statuses except draft)
   const { data: monthExpensesData } = await supabase
@@ -326,15 +363,21 @@ export interface ExportPreview {
     date: string
     merchant: string | null
     userName: string
+    receiptFileId: string | null
   }>
   totalRevenue: number
   totalExpenses: number
 }
 
-export async function getExportPreview(year: number, month: number): Promise<{ data?: ExportPreview; error?: string }> {
+export async function getExportPreview(
+  year: number,
+  month: number
+): Promise<{ data?: ExportPreview; error?: string }> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -362,14 +405,16 @@ export async function getExportPreview(year: number, month: number): Promise<{ d
   // Fetch invoices
   const { data: invoicesData } = await supabase
     .from('documents')
-    .select(`
+    .select(
+      `
       id,
       document_number,
       total,
       issue_date,
       status,
       customer:customers(name)
-    `)
+    `
+    )
     .eq('company_id', membership.company_id)
     .eq('document_type', 'invoice')
     .in('status', ['issued', 'paid'])
@@ -380,13 +425,15 @@ export async function getExportPreview(year: number, month: number): Promise<{ d
   // Fetch credit notes
   const { data: creditNotesData } = await supabase
     .from('documents')
-    .select(`
+    .select(
+      `
       id,
       document_number,
       total,
       issue_date,
       customer:customers(name)
-    `)
+    `
+    )
     .eq('company_id', membership.company_id)
     .eq('document_type', 'credit_note')
     .in('status', ['issued', 'paid'])
@@ -397,14 +444,17 @@ export async function getExportPreview(year: number, month: number): Promise<{ d
   // Fetch approved expenses
   const { data: expensesData } = await supabase
     .from('expenses')
-    .select(`
+    .select(
+      `
       id,
       amount,
       category,
       date,
       merchant,
+      receipt_file_id,
       profile:profiles(first_name, last_name, email)
-    `)
+    `
+    )
     .eq('company_id', membership.company_id)
     .eq('status', 'approved')
     .gte('date', periodStartStr)
@@ -435,10 +485,12 @@ export async function getExportPreview(year: number, month: number): Promise<{ d
     date: exp.date,
     merchant: exp.merchant,
     userName: exp.profile?.first_name || exp.profile?.email || 'Unknown',
+    receiptFileId: exp.receipt_file_id,
   }))
 
-  const totalRevenue = invoices.reduce((sum, inv) => sum + inv.total, 0) -
-                       creditNotes.reduce((sum, cn) => sum + cn.total, 0)
+  const totalRevenue =
+    invoices.reduce((sum, inv) => sum + inv.total, 0) -
+    creditNotes.reduce((sum, cn) => sum + cn.total, 0)
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
 
   return {
@@ -462,7 +514,9 @@ export async function createAccountingExport(
 ): Promise<{ data?: { id: string; csvContent: string }; error?: string }> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -510,21 +564,29 @@ export async function createAccountingExport(
 
   // Create CSV content
   const csvLines: string[] = []
-  csvLines.push('Type,Document Number,Date,Customer/Vendor,Category,Amount (EUR),Tax Rate,Tax Amount,Status')
+  csvLines.push(
+    'Type,Document Number,Date,Customer/Vendor,Category,Amount (EUR),Tax Rate,Tax Amount,Status'
+  )
 
   // Add invoices
   for (const inv of preview.invoices) {
-    csvLines.push(`Invoice,${inv.documentNumber},${inv.issueDate},"${inv.customerName}",,${inv.total.toFixed(2)},,,${inv.status}`)
+    csvLines.push(
+      `Invoice,${inv.documentNumber},${inv.issueDate},"${inv.customerName}",,${inv.total.toFixed(2)},,,${inv.status}`
+    )
   }
 
   // Add credit notes
   for (const cn of preview.creditNotes) {
-    csvLines.push(`Credit Note,${cn.documentNumber},${cn.issueDate},"${cn.customerName}",,-${cn.total.toFixed(2)},,,issued`)
+    csvLines.push(
+      `Credit Note,${cn.documentNumber},${cn.issueDate},"${cn.customerName}",,-${cn.total.toFixed(2)},,,issued`
+    )
   }
 
   // Add expenses
   for (const exp of preview.expenses) {
-    csvLines.push(`Expense,,${exp.date},"${exp.merchant || exp.userName}",${exp.category},${exp.amount.toFixed(2)},,,approved`)
+    csvLines.push(
+      `Expense,,${exp.date},"${exp.merchant || exp.userName}",${exp.category},${exp.amount.toFixed(2)},,,approved`
+    )
   }
 
   // Add summary
@@ -563,7 +625,7 @@ export async function createAccountingExport(
   }
 
   // Mark expenses as exported
-  const expenseIds = preview.expenses.map(e => e.id)
+  const expenseIds = preview.expenses.map((e) => e.id)
   if (expenseIds.length > 0) {
     await supabase
       .from('expenses')
@@ -586,10 +648,14 @@ export async function createAccountingExport(
   }
 }
 
-export async function downloadExportPackage(exportId: string): Promise<{ data?: { base64: string; filename: string }; error?: string }> {
+export async function downloadExportPackage(
+  exportId: string
+): Promise<{ data?: { base64: string; filename: string }; error?: string }> {
   const supabase = createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Unauthorized' }
   }
@@ -637,18 +703,26 @@ export async function downloadExportPackage(exportId: string): Promise<{ data?: 
 
   // Add CSV
   const csvLines: string[] = []
-  csvLines.push('Type,Document Number,Date,Customer/Vendor,Category,Amount (EUR),Tax Rate,Tax Amount,Status')
+  csvLines.push(
+    'Type,Document Number,Date,Customer/Vendor,Category,Amount (EUR),Tax Rate,Tax Amount,Status'
+  )
 
   for (const inv of preview.invoices) {
-    csvLines.push(`Invoice,${inv.documentNumber},${inv.issueDate},"${inv.customerName}",,${inv.total.toFixed(2)},,,${inv.status}`)
+    csvLines.push(
+      `Invoice,${inv.documentNumber},${inv.issueDate},"${inv.customerName}",,${inv.total.toFixed(2)},,,${inv.status}`
+    )
   }
 
   for (const cn of preview.creditNotes) {
-    csvLines.push(`Credit Note,${cn.documentNumber},${cn.issueDate},"${cn.customerName}",,-${cn.total.toFixed(2)},,,issued`)
+    csvLines.push(
+      `Credit Note,${cn.documentNumber},${cn.issueDate},"${cn.customerName}",,-${cn.total.toFixed(2)},,,issued`
+    )
   }
 
   for (const expense of preview.expenses) {
-    csvLines.push(`Expense,,${expense.date},"${expense.merchant || expense.userName}",${expense.category},${expense.amount.toFixed(2)},,,approved`)
+    csvLines.push(
+      `Expense,,${expense.date},"${expense.merchant || expense.userName}",${expense.category},${expense.amount.toFixed(2)},,,approved`
+    )
   }
 
   csvLines.push('')
@@ -667,11 +741,13 @@ export async function downloadExportPackage(exportId: string): Promise<{ data?: 
     try {
       const { data: document } = await supabase
         .from('documents')
-        .select(`
+        .select(
+          `
           *,
           customer:customers(*),
           lines:document_lines(*)
-        `)
+        `
+        )
         .eq('id', inv.id)
         .single()
 
@@ -732,6 +808,53 @@ export async function downloadExportPackage(exportId: string): Promise<{ data?: 
       }
     } catch (err) {
       console.error(`Error generating PDF for invoice ${inv.id}:`, err)
+    }
+  }
+
+  // Add expense receipts
+  const receiptsFolder = zip.folder('receipts')
+
+  // Get file info for expenses with receipts
+  const expensesWithReceipts = preview.expenses.filter((e) => e.receiptFileId)
+
+  if (expensesWithReceipts.length > 0) {
+    const receiptFileIds = expensesWithReceipts
+      .map((e) => e.receiptFileId)
+      .filter(Boolean) as string[]
+
+    // Fetch file metadata
+    const { data: filesData } = await supabase
+      .from('files')
+      .select('id, storage_path, storage_bucket, file_name, file_type')
+      .in('id', receiptFileIds)
+
+    if (filesData) {
+      for (const expense of expensesWithReceipts) {
+        const fileInfo = filesData.find((f: any) => f.id === expense.receiptFileId)
+        if (fileInfo) {
+          try {
+            // Download the file from Supabase storage
+            const { data: fileData, error: downloadError } = await supabase.storage
+              .from((fileInfo as any).storage_bucket)
+              .download((fileInfo as any).storage_path)
+
+            if (fileData && !downloadError) {
+              // Convert blob to array buffer
+              const arrayBuffer = await fileData.arrayBuffer()
+              const buffer = Buffer.from(arrayBuffer)
+
+              // Create a descriptive filename
+              const originalName = (fileInfo as any).file_name || 'receipt'
+              const extension = originalName.split('.').pop() || 'jpg'
+              const receiptFilename = `${expense.date}_${expense.category}_${expense.amount.toFixed(2)}EUR.${extension}`
+
+              receiptsFolder?.file(receiptFilename, buffer)
+            }
+          } catch (err) {
+            console.error(`Error downloading receipt for expense ${expense.id}:`, err)
+          }
+        }
+      }
     }
   }
 
