@@ -2,7 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { calculateMileageExpense } from '@/lib/mileage'
 import type { Expense, ActionResult, PaginatedResult, ExpenseStatus, ExpenseCategory, TaxRate } from '@/types'
+
+// Re-export the mileage helper for use in client components
+export { calculateMileageExpense } from '@/lib/mileage'
 
 export interface ExpensesFilter {
   projectId?: string
@@ -516,16 +520,6 @@ export async function getReceiptUrl(expenseId: string): Promise<string | null> {
     .createSignedUrl(file.storage_path, 3600)
 
   return data?.signedUrl || null
-}
-
-// Mileage calculation helper
-export function calculateMileageExpense(
-  distanceKm: number,
-  ratePerKm: number = 0.42 // Default Austrian official rate
-): { amount: number; description: string } {
-  const amount = Math.round(distanceKm * ratePerKm * 100) / 100
-  const description = `Mileage: ${distanceKm} km @ €${ratePerKm.toFixed(2)}/km`
-  return { amount, description }
 }
 
 export async function createMileageExpense(input: {
