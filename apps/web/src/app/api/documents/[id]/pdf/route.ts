@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { notFoundResponse, badRequestResponse, errorResponse } from '@/lib/api-utils'
+import { logError } from '@/lib/errors'
 
 const taxRateLabels: Record<string, string> = {
   standard_20: '20%',
@@ -28,25 +30,32 @@ function formatDate(date: string): string {
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-  const supabase = await createClient()
+): Promise<NextResponse> {
+  try {
+    const { id } = await params
 
-  // Fetch document with customer and lines
-  const { data: document, error } = await supabase
-    .from('documents')
-    .select('*, customer:customers(*), lines:document_lines(*)')
-    .eq('id', id)
-    .single()
+    // Validate UUID format
+    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return badRequestResponse('Invalid document ID')
+    }
 
-  if (error || !document) {
-    return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-  }
+    const supabase = await createClient()
 
-  // Only allow issued or paid documents to be printed
-  if (!['issued', 'paid'].includes(document.status)) {
-    return NextResponse.json({ error: 'Document must be issued first' }, { status: 400 })
-  }
+    // Fetch document with customer and lines
+    const { data: document, error } = await supabase
+      .from('documents')
+      .select('*, customer:customers(*), lines:document_lines(*)')
+      .eq('id', id)
+      .single()
+
+    if (error || !document) {
+      return notFoundResponse('Document')
+    }
+
+    // Only allow issued or paid documents to be printed
+    if (!['issued', 'paid'].includes(document.status)) {
+      return badRequestResponse('Document must be issued before viewing/printing')
+    }
 
   const company = document.company_snapshot || {}
   const customer = document.customer_snapshot || document.customer || {}
@@ -368,9 +377,14 @@ export async function GET(
 </html>
   `
 
-  return new NextResponse(html, {
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-    },
-  })
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
+  } catch (error) {
+    logError(error, { route: 'api/documents/[id]/pdf' })
+    return errorResponse('Failed to generate document', 500, 'PDF_GENERATION_ERROR')
+  }
 }
