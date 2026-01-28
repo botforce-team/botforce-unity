@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { Breadcrumbs } from '@/components/ui'
@@ -20,8 +20,11 @@ export default async function AuthenticatedLayout({
     redirect('/login')
   }
 
-  // Get user profile and company membership (use maybeSingle to handle RLS)
-  const { data: membership } = await supabase
+  // Use admin client for role query to bypass RLS
+  const adminClient = await createAdminClient()
+
+  // Get user profile and company membership
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('role')
     .eq('user_id', user.id)
@@ -29,7 +32,7 @@ export default async function AuthenticatedLayout({
     .maybeSingle()
 
   // Get profile separately
-  const { data: profile } = await supabase
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('full_name, email')
     .eq('id', user.id)

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { getCompanyInfo, getUserProfile } from '@/app/actions/settings'
 import { getRevolutConnection } from '@/app/actions/revolut'
@@ -12,11 +12,16 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  // Get user role
-  const { data: membership } = await supabase
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Get user role using admin client to bypass RLS
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('role')
+    .eq('user_id', user?.id || '')
     .eq('is_active', true)
     .maybeSingle()
 
