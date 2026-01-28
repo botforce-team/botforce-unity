@@ -438,6 +438,133 @@ export interface AuditLog {
 }
 
 // ============================================================================
+// Revolut Integration Types
+// ============================================================================
+
+export type RevolutConnectionStatus = 'active' | 'expired' | 'revoked' | 'error'
+export type RevolutSyncStatus = 'pending' | 'syncing' | 'completed' | 'failed'
+export type RevolutPaymentStatus = 'pending' | 'processing' | 'completed' | 'declined' | 'failed' | 'cancelled'
+
+export interface RevolutConnection {
+  id: string
+  company_id: string
+  status: RevolutConnectionStatus
+  revolut_business_id: string | null
+  last_sync_at: string | null
+  last_sync_status: RevolutSyncStatus | null
+  last_sync_error: string | null
+  connected_at: string
+  disconnected_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RevolutAccount {
+  id: string
+  company_id: string
+  connection_id: string
+  revolut_account_id: string
+  name: string | null
+  currency: string
+  balance: number
+  state: string | null
+  iban: string | null
+  bic: string | null
+  account_number: string | null
+  sort_code: string | null
+  is_primary: boolean
+  balance_updated_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RevolutTransaction {
+  id: string
+  company_id: string
+  account_id: string
+  revolut_transaction_id: string
+  revolut_leg_id: string | null
+  type: string
+  state: string
+  amount: number
+  currency: string
+  fee: number | null
+  balance_after: number | null
+  counterparty_name: string | null
+  counterparty_account_id: string | null
+  counterparty_account_type: string | null
+  reference: string | null
+  description: string | null
+  merchant_name: string | null
+  merchant_category_code: string | null
+  merchant_city: string | null
+  merchant_country: string | null
+  card_last_four: string | null
+  transaction_date: string
+  created_at_revolut: string | null
+  completed_at_revolut: string | null
+  expense_id: string | null
+  document_id: string | null
+  category: string | null
+  is_reconciled: boolean
+  reconciled_at: string | null
+  reconciled_by: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  account?: RevolutAccount
+  expense?: Expense
+  document?: Document
+}
+
+export interface RevolutPayment {
+  id: string
+  company_id: string
+  connection_id: string
+  source_account_id: string | null
+  revolut_payment_id: string | null
+  amount: number
+  currency: string
+  reference: string | null
+  recipient_name: string
+  recipient_iban: string | null
+  recipient_bic: string | null
+  recipient_account_number: string | null
+  recipient_sort_code: string | null
+  recipient_country: string | null
+  status: RevolutPaymentStatus
+  reason_code: string | null
+  error_message: string | null
+  document_id: string | null
+  expense_id: string | null
+  request_id: string
+  created_by: string
+  approved_by: string | null
+  scheduled_date: string | null
+  submitted_at: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RevolutSyncLog {
+  id: string
+  company_id: string
+  connection_id: string
+  sync_type: string
+  status: RevolutSyncStatus
+  records_fetched: number
+  records_created: number
+  records_updated: number
+  error_message: string | null
+  error_details: Record<string, unknown> | null
+  started_at: string
+  completed_at: string | null
+  duration_ms: number | null
+}
+
+// ============================================================================
 // UI / Helper Types
 // ============================================================================
 

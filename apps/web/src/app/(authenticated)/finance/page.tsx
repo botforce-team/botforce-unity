@@ -9,20 +9,44 @@ import {
   getRecentTransactions,
   getCashForecast,
 } from '@/app/actions/finance'
+import {
+  getRevolutConnection,
+  getRevolutAccounts,
+  getRevolutBalances,
+  getRecentRevolutTransactions,
+} from '@/app/actions/revolut'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { RevenueChart } from './revenue-chart'
 import { CashFlowChart } from './cash-flow-chart'
+import { RevolutBalanceCard } from '@/components/finance/revolut-balance-card'
+import { RevolutTransactions } from '@/components/finance/revolut-transactions'
 
 export default async function FinancePage() {
-  const [overview, monthlyData, topCustomers, expensesByCategory, recentTransactions, cashForecast] =
-    await Promise.all([
-      getFinanceOverview(),
-      getMonthlyRevenue(6),
-      getRevenueByCustomer(5),
-      getExpensesByCategory(),
-      getRecentTransactions(8),
-      getCashForecast(12),
-    ])
+  const [
+    overview,
+    monthlyData,
+    topCustomers,
+    expensesByCategory,
+    recentTransactions,
+    cashForecast,
+    revolutConnection,
+    revolutAccounts,
+    revolutBalances,
+    revolutTransactions,
+  ] = await Promise.all([
+    getFinanceOverview(),
+    getMonthlyRevenue(6),
+    getRevenueByCustomer(5),
+    getExpensesByCategory(),
+    getRecentTransactions(8),
+    getCashForecast(12),
+    getRevolutConnection(),
+    getRevolutAccounts(),
+    getRevolutBalances(),
+    getRecentRevolutTransactions(10),
+  ])
+
+  const isRevolutConnected = revolutConnection.data?.status === 'active'
 
   const categoryLabels: Record<string, string> = {
     mileage: 'Mileage',
@@ -46,7 +70,7 @@ export default async function FinancePage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -130,6 +154,13 @@ export default async function FinancePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Bank Balance Card */}
+        <RevolutBalanceCard
+          accounts={revolutAccounts.data || []}
+          balances={revolutBalances.data || {}}
+          isConnected={isRevolutConnected}
+        />
       </div>
 
       {/* Charts Row */}
@@ -237,10 +268,10 @@ export default async function FinancePage() {
           </CardContent>
         </Card>
 
-        {/* Recent Transactions */}
+        {/* Recent Transactions (Invoices/Expenses) */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
+            <CardTitle>Recent Invoice/Expense Activity</CardTitle>
           </CardHeader>
           <CardContent>
             {recentTransactions.length === 0 ? (
@@ -285,6 +316,14 @@ export default async function FinancePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bank Transactions (from Revolut) */}
+      {isRevolutConnected && (revolutTransactions.data?.length || 0) > 0 && (
+        <RevolutTransactions
+          transactions={revolutTransactions.data || []}
+          total={revolutTransactions.data?.length || 0}
+        />
+      )}
     </div>
   )
 }
