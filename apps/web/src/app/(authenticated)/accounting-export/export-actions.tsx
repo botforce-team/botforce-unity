@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { MoreHorizontal, Download, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Download, Trash2, Archive, FileText } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { deleteAccountingExport, generateExportCSV } from '@/app/actions/accounting-export'
+import { deleteAccountingExport, generateExportCSV, generateExportZip, getReceiptSignedUrls } from '@/app/actions/accounting-export'
 import type { AccountingExport } from '@/types'
 
 interface ExportActionsProps {
@@ -14,8 +14,9 @@ export function ExportActions({ export: exp }: ExportActionsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState<string | null>(null)
 
-  const handleDownload = () => {
+  const handleDownloadCSV = () => {
     startTransition(async () => {
       const result = await generateExportCSV(exp.id)
       if (result.success && result.data) {
@@ -34,6 +35,84 @@ export function ExportActions({ export: exp }: ExportActionsProps) {
       }
       setIsOpen(false)
     })
+  }
+
+  const handleDownloadZip = async () => {
+    setDownloadProgress('Preparing export...')
+
+    try {
+      // Get export data
+      const result = await generateExportZip(exp.id)
+      if (!result.success || !result.data) {
+        alert(result.error || 'Failed to prepare export')
+        setDownloadProgress(null)
+        return
+      }
+
+      const { csvData, receipts } = result.data
+
+      // Dynamically import JSZip
+      setDownloadProgress('Loading ZIP library...')
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+
+      // Add CSV file
+      setDownloadProgress('Adding CSV data...')
+      zip.file('accounting_export.csv', csvData)
+
+      // Create folders
+      const receiptsFolder = zip.folder('receipts')
+
+      // Fetch and add receipt files
+      if (receipts.length > 0 && receiptsFolder) {
+        setDownloadProgress(`Fetching ${receipts.length} receipts...`)
+
+        // Get signed URLs for all receipts
+        const urlsResult = await getReceiptSignedUrls(receipts.map(r => r.storagePath))
+
+        if (urlsResult.success && urlsResult.data) {
+          for (let i = 0; i < receipts.length; i++) {
+            const receipt = receipts[i]
+            const signedUrl = urlsResult.data[receipt.storagePath]
+
+            if (signedUrl) {
+              setDownloadProgress(`Downloading receipt ${i + 1}/${receipts.length}...`)
+
+              try {
+                const response = await fetch(signedUrl)
+                if (response.ok) {
+                  const blob = await response.blob()
+                  const ext = receipt.storagePath.split('.').pop() || 'jpg'
+                  receiptsFolder.file(`expense_${receipt.expenseId}.${ext}`, blob)
+                }
+              } catch (err) {
+                console.error(`Failed to fetch receipt ${receipt.expenseId}:`, err)
+              }
+            }
+          }
+        }
+      }
+
+      // Generate and download ZIP
+      setDownloadProgress('Creating ZIP file...')
+      const content = await zip.generateAsync({ type: 'blob' })
+
+      const url = URL.createObjectURL(content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${exp.name.replace(/\s+/g, '_')}_${exp.period_start}_${exp.period_end}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      setDownloadProgress(null)
+      setIsOpen(false)
+    } catch (err) {
+      console.error('Failed to create ZIP:', err)
+      alert('Failed to create ZIP file')
+      setDownloadProgress(null)
+    }
   }
 
   const handleDelete = () => {
@@ -93,14 +172,24 @@ export function ExportActions({ export: exp }: ExportActionsProps) {
             ) : (
               <div className="py-1">
                 {exp.status === 'completed' && (
-                  <button
-                    onClick={handleDownload}
-                    disabled={isPending}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-hover disabled:opacity-50"
-                  >
-                    <Download className="h-4 w-4" />
-                    {isPending ? 'Generating...' : 'Download CSV'}
-                  </button>
+                  <>
+                    <button
+                      onClick={handleDownloadCSV}
+                      disabled={isPending || !!downloadProgress}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-hover disabled:opacity-50"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {isPending ? 'Generating...' : 'Download CSV'}
+                    </button>
+                    <button
+                      onClick={handleDownloadZip}
+                      disabled={isPending || !!downloadProgress}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-hover disabled:opacity-50"
+                    >
+                      <Archive className="h-4 w-4" />
+                      {downloadProgress || 'Download ZIP (with receipts)'}
+                    </button>
+                  </>
                 )}
                 {!exp.is_locked && (
                   <>

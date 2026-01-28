@@ -249,6 +249,117 @@ export async function generateExportCSV(id: string): Promise<ActionResult<string
   return { success: true, data: csv }
 }
 
+// Generate ZIP export with PDFs and receipts
+export async function generateExportZip(id: string): Promise<ActionResult<{
+  csvData: string
+  invoices: Array<{ id: string; number: string; customerId: string }>
+  receipts: Array<{ expenseId: string; fileId: string; storagePath: string }>
+}>> {
+  const supabase = await createClient()
+
+  const { data: exportData } = await supabase
+    .from('accounting_exports')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (!exportData) {
+    return { success: false, error: 'Export not found' }
+  }
+
+  // Get invoices with their PDF info
+  const { data: invoices } = await supabase
+    .from('documents')
+    .select('id, document_number, customer_id')
+    .eq('document_type', 'invoice')
+    .in('status', ['issued', 'paid'])
+    .gte('issue_date', exportData.period_start)
+    .lte('issue_date', exportData.period_end)
+    .order('issue_date')
+
+  // Get credit notes
+  const { data: creditNotes } = await supabase
+    .from('documents')
+    .select('id, document_number, customer_id')
+    .eq('document_type', 'credit_note')
+    .in('status', ['issued', 'paid'])
+    .gte('issue_date', exportData.period_start)
+    .lte('issue_date', exportData.period_end)
+    .order('issue_date')
+
+  // Get expenses with receipt files
+  const { data: expenses } = await supabase
+    .from('expenses')
+    .select(`
+      id,
+      receipt_file_id,
+      receipt_file:files(id, storage_path, original_filename)
+    `)
+    .eq('status', 'approved')
+    .gte('date', exportData.period_start)
+    .lte('date', exportData.period_end)
+    .not('receipt_file_id', 'is', null)
+
+  // Generate CSV
+  const csvResult = await generateExportCSV(id)
+  if (!csvResult.success || !csvResult.data) {
+    return { success: false, error: 'Failed to generate CSV' }
+  }
+
+  // Compile receipt info
+  const receipts = (expenses || [])
+    .filter((exp: any) => exp.receipt_file)
+    .map((exp: any) => ({
+      expenseId: exp.id,
+      fileId: exp.receipt_file.id,
+      storagePath: exp.receipt_file.storage_path,
+    }))
+
+  // Compile invoice info for PDF generation
+  const allDocs = [
+    ...(invoices || []).map((inv: any) => ({
+      id: inv.id,
+      number: inv.document_number,
+      customerId: inv.customer_id,
+    })),
+    ...(creditNotes || []).map((cn: any) => ({
+      id: cn.id,
+      number: cn.document_number,
+      customerId: cn.customer_id,
+    })),
+  ]
+
+  return {
+    success: true,
+    data: {
+      csvData: csvResult.data,
+      invoices: allDocs,
+      receipts,
+    },
+  }
+}
+
+// Get signed URLs for receipt files
+export async function getReceiptSignedUrls(
+  receiptPaths: string[]
+): Promise<ActionResult<Record<string, string>>> {
+  const supabase = await createClient()
+
+  const urls: Record<string, string> = {}
+
+  for (const path of receiptPaths) {
+    const { data } = await supabase.storage
+      .from('receipts')
+      .createSignedUrl(path, 3600) // 1 hour validity
+
+    if (data?.signedUrl) {
+      urls[path] = data.signedUrl
+    }
+  }
+
+  return { success: true, data: urls }
+}
+
 // Get available period stats (for the form)
 export async function getExportPeriodStats(
   periodStart: string,

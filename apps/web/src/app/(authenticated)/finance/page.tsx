@@ -7,18 +7,21 @@ import {
   getRevenueByCustomer,
   getExpensesByCategory,
   getRecentTransactions,
+  getCashForecast,
 } from '@/app/actions/finance'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { RevenueChart } from './revenue-chart'
+import { CashFlowChart } from './cash-flow-chart'
 
 export default async function FinancePage() {
-  const [overview, monthlyData, topCustomers, expensesByCategory, recentTransactions] =
+  const [overview, monthlyData, topCustomers, expensesByCategory, recentTransactions, cashForecast] =
     await Promise.all([
       getFinanceOverview(),
       getMonthlyRevenue(6),
       getRevenueByCustomer(5),
       getExpensesByCategory(),
       getRecentTransactions(8),
+      getCashForecast(12),
     ])
 
   const categoryLabels: Record<string, string> = {
@@ -184,6 +187,16 @@ export default async function FinancePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cash Forecast */}
+      <Card>
+        <CardHeader>
+          <CardTitle>12-Week Cash Forecast</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CashFlowChart data={cashForecast} />
+        </CardContent>
+      </Card>
 
       {/* Bottom Row */}
       <div className="grid gap-6 lg:grid-cols-2">

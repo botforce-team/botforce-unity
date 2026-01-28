@@ -359,3 +359,248 @@ export async function rejectExpense(
   return { success: true, data: data as Expense }
 }
 
+export async function markExpenseReimbursed(id: string): Promise<ActionResult<Expense>> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .update({
+      reimbursed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('status', 'approved')
+    .eq('is_reimbursable', true)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error marking expense as reimbursed:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/expenses')
+  return { success: true, data: data as Expense }
+}
+
+export async function uploadReceipt(
+  expenseId: string,
+  formData: FormData
+): Promise<ActionResult<{ fileId: string; url: string }>> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const file = formData.get('file') as File
+  if (!file) {
+    return { success: false, error: 'No file provided' }
+  }
+
+  // Validate file type
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+  if (!allowedTypes.includes(file.type)) {
+    return { success: false, error: 'Invalid file type. Allowed: JPEG, PNG, WebP, PDF' }
+  }
+
+  // Validate file size (max 10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    return { success: false, error: 'File too large. Maximum size: 10MB' }
+  }
+
+  // Get user's company
+  const { data: membership } = await supabase
+    .from('company_members')
+    .select('company_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  if (!membership) {
+    return { success: false, error: 'No company membership found' }
+  }
+
+  // Generate unique filename
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const filename = `${membership.company_id}/${expenseId}/${Date.now()}.${ext}`
+
+  // Upload to Supabase Storage
+  const { error: uploadError } = await supabase.storage
+    .from('receipts')
+    .upload(filename, file, {
+      contentType: file.type,
+      upsert: false,
+    })
+
+  if (uploadError) {
+    console.error('Error uploading receipt:', uploadError)
+    return { success: false, error: 'Failed to upload file' }
+  }
+
+  // Create file record
+  const { data: fileRecord, error: recordError } = await supabase
+    .from('files')
+    .insert({
+      company_id: membership.company_id,
+      user_id: user.id,
+      category: 'receipt',
+      filename: filename,
+      original_filename: file.name,
+      mime_type: file.type,
+      size_bytes: file.size,
+      storage_path: filename,
+    })
+    .select()
+    .single()
+
+  if (recordError) {
+    console.error('Error creating file record:', recordError)
+    // Try to delete the uploaded file
+    await supabase.storage.from('receipts').remove([filename])
+    return { success: false, error: 'Failed to create file record' }
+  }
+
+  // Update expense with file reference
+  const { error: updateError } = await supabase
+    .from('expenses')
+    .update({
+      receipt_file_id: fileRecord.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', expenseId)
+
+  if (updateError) {
+    console.error('Error updating expense with receipt:', updateError)
+  }
+
+  // Get signed URL
+  const { data: urlData } = await supabase.storage
+    .from('receipts')
+    .createSignedUrl(filename, 3600)
+
+  revalidatePath('/expenses')
+  return { success: true, data: { fileId: fileRecord.id, url: urlData?.signedUrl || '' } }
+}
+
+export async function getReceiptUrl(expenseId: string): Promise<string | null> {
+  const supabase = await createClient()
+
+  const { data: expense } = await supabase
+    .from('expenses')
+    .select('receipt_file_id')
+    .eq('id', expenseId)
+    .single()
+
+  if (!expense?.receipt_file_id) {
+    return null
+  }
+
+  const { data: file } = await supabase
+    .from('files')
+    .select('storage_path')
+    .eq('id', expense.receipt_file_id)
+    .single()
+
+  if (!file?.storage_path) {
+    return null
+  }
+
+  // Get signed URL (valid for 1 hour)
+  const { data } = await supabase.storage
+    .from('receipts')
+    .createSignedUrl(file.storage_path, 3600)
+
+  return data?.signedUrl || null
+}
+
+// Mileage calculation helper
+export function calculateMileageExpense(
+  distanceKm: number,
+  ratePerKm: number = 0.42 // Default Austrian official rate
+): { amount: number; description: string } {
+  const amount = Math.round(distanceKm * ratePerKm * 100) / 100
+  const description = `Mileage: ${distanceKm} km @ €${ratePerKm.toFixed(2)}/km`
+  return { amount, description }
+}
+
+export async function createMileageExpense(input: {
+  project_id?: string | null
+  date: string
+  distance_km: number
+  from_location: string
+  to_location: string
+  round_trip: boolean
+}): Promise<ActionResult<Expense>> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Get company and mileage rate
+  const { data: membership } = await supabase
+    .from('company_members')
+    .select('company_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  if (!membership) {
+    return { success: false, error: 'No company membership found' }
+  }
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('settings')
+    .eq('id', membership.company_id)
+    .single()
+
+  // Get mileage rate from company settings or use default
+  const settings = company?.settings as { mileage_rate?: number } | null
+  const mileageRate = settings?.mileage_rate || 0.42
+
+  // Calculate total distance
+  const totalDistance = input.round_trip ? input.distance_km * 2 : input.distance_km
+  const { amount, description } = calculateMileageExpense(totalDistance, mileageRate)
+
+  // Create the expense
+  const fullDescription = `${description}\n${input.from_location} → ${input.to_location}${input.round_trip ? ' (round trip)' : ''}`
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert({
+      company_id: membership.company_id,
+      user_id: user.id,
+      project_id: input.project_id || null,
+      date: input.date,
+      amount,
+      currency: 'EUR',
+      tax_rate: 'zero',
+      tax_amount: 0,
+      category: 'mileage',
+      description: fullDescription,
+      merchant: null,
+      is_reimbursable: true,
+      status: 'draft',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating mileage expense:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/expenses')
+  return { success: true, data: data as Expense }
+}
+

@@ -13,6 +13,7 @@ import {
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { getProject, getProjectTeam } from '@/app/actions/projects'
 import { createClient } from '@/lib/supabase/server'
+import { ManageTeamDialog } from '@/components/projects/manage-team-dialog'
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>
@@ -221,6 +222,11 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
               <Users className="h-5 w-5 text-text-secondary" />
               Team
             </CardTitle>
+            <ManageTeamDialog
+              projectId={id}
+              projectName={project.name}
+              currentTeam={team}
+            />
           </CardHeader>
           <CardContent>
             {team.length > 0 ? (

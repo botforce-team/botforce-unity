@@ -242,6 +242,119 @@ export async function getExpensesByCategory(): Promise<ExpensesByCategory[]> {
     .sort((a, b) => b.amount - a.amount)
 }
 
+// Cash forecast - 12 weeks projection
+export interface CashForecastWeek {
+  weekStart: string
+  weekEnd: string
+  weekLabel: string
+  expectedIncome: number
+  expectedExpenses: number
+  netCashFlow: number
+  cumulativeBalance: number
+}
+
+export async function getCashForecast(weeks: number = 12): Promise<CashForecastWeek[]> {
+  const supabase = await createClient()
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Get current outstanding invoices (expected income)
+  const { data: outstandingInvoices } = await supabase
+    .from('documents')
+    .select('id, total, due_date')
+    .eq('document_type', 'invoice')
+    .eq('status', 'issued')
+
+  // Get recurring invoice templates for future projections
+  const { data: recurringTemplates } = await supabase
+    .from('recurring_invoice_templates')
+    .select('id, total, frequency, next_issue_date, payment_terms_days')
+    .eq('is_active', true)
+
+  // Get average weekly expenses from past 8 weeks
+  const eightWeeksAgo = new Date(today)
+  eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56)
+
+  const { data: recentExpenses } = await supabase
+    .from('expenses')
+    .select('amount, date')
+    .eq('status', 'approved')
+    .gte('date', eightWeeksAgo.toISOString().split('T')[0])
+
+  const totalRecentExpenses = recentExpenses?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0
+  const avgWeeklyExpenses = totalRecentExpenses / 8
+
+  // Generate weekly forecast
+  const forecast: CashForecastWeek[] = []
+  let cumulativeBalance = 0
+
+  // Get starting balance (current cash position)
+  // For simplicity, we'll start from outstanding invoices minus pending expenses
+  const { data: pendingExpenses } = await supabase
+    .from('expenses')
+    .select('amount')
+    .in('status', ['submitted', 'approved'])
+    .is('reimbursed_at', null)
+    .eq('is_reimbursable', true)
+
+  const pendingExpenseTotal = pendingExpenses?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0
+  cumulativeBalance = -pendingExpenseTotal // Start with pending obligations
+
+  for (let i = 0; i < weeks; i++) {
+    const weekStart = new Date(today)
+    weekStart.setDate(weekStart.getDate() + i * 7)
+
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 6)
+
+    let expectedIncome = 0
+
+    // Add outstanding invoices due this week
+    outstandingInvoices?.forEach((inv) => {
+      if (inv.due_date) {
+        const dueDate = new Date(inv.due_date)
+        if (dueDate >= weekStart && dueDate <= weekEnd) {
+          expectedIncome += inv.total || 0
+        }
+      }
+    })
+
+    // Add recurring invoices expected to be issued and paid
+    recurringTemplates?.forEach((template: any) => {
+      if (template.next_issue_date) {
+        const issueDate = new Date(template.next_issue_date)
+        const paymentDays = template.payment_terms_days || 14
+        const expectedPayDate = new Date(issueDate)
+        expectedPayDate.setDate(expectedPayDate.getDate() + paymentDays)
+
+        if (expectedPayDate >= weekStart && expectedPayDate <= weekEnd) {
+          expectedIncome += template.total || 0
+        }
+      }
+    })
+
+    const expectedExpenses = Math.round(avgWeeklyExpenses)
+    const netCashFlow = expectedIncome - expectedExpenses
+    cumulativeBalance += netCashFlow
+
+    // Format week label
+    const weekLabel = `W${i + 1} (${weekStart.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })})`
+
+    forecast.push({
+      weekStart: weekStart.toISOString().split('T')[0],
+      weekEnd: weekEnd.toISOString().split('T')[0],
+      weekLabel,
+      expectedIncome,
+      expectedExpenses,
+      netCashFlow,
+      cumulativeBalance,
+    })
+  }
+
+  return forecast
+}
+
 export async function getRecentTransactions(limit: number = 10) {
   const supabase = await createClient()
 

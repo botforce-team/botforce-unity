@@ -273,10 +273,13 @@ export async function getCustomersForSelect(): Promise<{ value: string; label: s
 export async function getProjectTeam(projectId: string) {
   const supabase = await createClient()
 
-  // Get assignments first
+  // Get assignments with profiles
   const { data: assignments, error } = await supabase
     .from('project_assignments')
-    .select('*')
+    .select(`
+      *,
+      profile:profiles(id, full_name, email)
+    `)
     .eq('project_id', projectId)
     .eq('is_active', true)
 
@@ -285,22 +288,49 @@ export async function getProjectTeam(projectId: string) {
     return []
   }
 
-  if (!assignments || assignments.length === 0) {
-    return []
-  }
+  return assignments || []
+}
 
-  // Get user info from company_members
-  const userIds = assignments.map((a) => a.user_id)
-  const { data: members } = await supabase
+// Get available team members (company members not yet assigned to project)
+export async function getAvailableTeamMembers(projectId: string) {
+  const supabase = await createClient()
+
+  // Get current user's company
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data: membership } = await supabase
     .from('company_members')
-    .select('user_id, role')
-    .in('user_id', userIds)
+    .select('company_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
 
-  // Combine the data
-  return assignments.map((assignment) => ({
-    ...assignment,
-    member: members?.find((m) => m.user_id === assignment.user_id) || null,
-  }))
+  if (!membership) return []
+
+  // Get all active company members
+  const { data: companyMembers } = await supabase
+    .from('company_members')
+    .select(`
+      user_id,
+      role,
+      hourly_rate,
+      profile:profiles(id, full_name, email)
+    `)
+    .eq('company_id', membership.company_id)
+    .eq('is_active', true)
+
+  // Get current project assignments
+  const { data: currentAssignments } = await supabase
+    .from('project_assignments')
+    .select('user_id')
+    .eq('project_id', projectId)
+    .eq('is_active', true)
+
+  const assignedUserIds = new Set((currentAssignments || []).map(a => a.user_id))
+
+  // Filter out already assigned members
+  return (companyMembers || []).filter(m => !assignedUserIds.has(m.user_id))
 }
 
 export async function addTeamMember(
