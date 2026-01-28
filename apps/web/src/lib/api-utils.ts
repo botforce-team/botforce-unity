@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { logError, AppError, AuthError } from '@/lib/errors'
 
 // ============================================================================
@@ -109,8 +109,9 @@ export function withAuth<T>(handler: ApiHandler<T>) {
         return unauthorizedResponse()
       }
 
-      // Get company membership
-      const { data: membership, error: membershipError } = await supabase
+      // Get company membership using admin client to bypass RLS
+      const adminClient = await createAdminClient()
+      const { data: membership, error: membershipError } = await adminClient
         .from('company_members')
         .select('company_id')
         .eq('user_id', user.id)

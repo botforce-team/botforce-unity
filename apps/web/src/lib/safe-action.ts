@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { logError, AppError, AuthError, ValidationError, errorToResult } from '@/lib/errors'
 import type { ActionResult } from '@/types'
 
@@ -65,8 +65,9 @@ export function createSafeAction<TInput, TOutput = void>(
         throw new AuthError('Please sign in to continue')
       }
 
-      // 3. Get company membership
-      const { data: membership, error: membershipError } = await supabase
+      // 3. Get company membership using admin client to bypass RLS
+      const adminClient = await createAdminClient()
+      const { data: membership, error: membershipError } = await adminClient
         .from('company_members')
         .select('company_id')
         .eq('user_id', user.id)
@@ -156,8 +157,9 @@ export function createRoleProtectedAction<TInput, TOutput = void>(
         throw new AuthError('Please sign in to continue')
       }
 
-      // 3. Get company membership with role
-      const { data: membership, error: membershipError } = await supabase
+      // 3. Get company membership with role using admin client to bypass RLS
+      const adminClient = await createAdminClient()
+      const { data: membership, error: membershipError } = await adminClient
         .from('company_members')
         .select('company_id, role')
         .eq('user_id', user.id)
@@ -245,7 +247,9 @@ export async function getUserMembership() {
     throw new AuthError('Please sign in to continue')
   }
 
-  const { data: membership, error: membershipError } = await supabase
+  // Use admin client to bypass RLS
+  const adminClient = await createAdminClient()
+  const { data: membership, error: membershipError } = await adminClient
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
