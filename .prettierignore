@@ -1,9 +1,6 @@
-node_modules
-.next
-.vercel
-coverage
-playwright-report
-dist
-build
-*.min.js
+node_modules/
+.next/
+dist/
+build/
+coverage/
 pnpm-lock.yaml

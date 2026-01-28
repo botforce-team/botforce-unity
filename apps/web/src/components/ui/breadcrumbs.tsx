@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronRight, Home } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface BreadcrumbItem {
   label: string
@@ -11,119 +12,94 @@ interface BreadcrumbItem {
 
 interface BreadcrumbsProps {
   items?: BreadcrumbItem[]
-  showHome?: boolean
+  className?: string
 }
 
-// Route to label mapping
 const routeLabels: Record<string, string> = {
   dashboard: 'Dashboard',
+  customers: 'Customers',
+  projects: 'Projects',
   timesheets: 'Timesheets',
   documents: 'Documents',
   expenses: 'Expenses',
-  customers: 'Customers',
-  projects: 'Projects',
+  finance: 'Finance',
   team: 'Team',
   settings: 'Settings',
-  finance: 'Finance',
-  'accounting-export': 'Accounting Export',
   new: 'New',
   edit: 'Edit',
+  recurring: 'Recurring',
+  'accounting-export': 'Accounting Export',
 }
 
-export function Breadcrumbs({ items, showHome = true }: BreadcrumbsProps) {
+export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   const pathname = usePathname()
 
-  // Generate breadcrumbs from pathname if items not provided
-  const breadcrumbs: BreadcrumbItem[] = items || generateBreadcrumbs(pathname)
+  // If no items provided, auto-generate from pathname
+  const breadcrumbItems: BreadcrumbItem[] = items || generateBreadcrumbs(pathname)
 
-  if (breadcrumbs.length === 0) return null
+  if (breadcrumbItems.length <= 1) {
+    return null
+  }
 
   return (
-    <nav className="flex items-center gap-1 text-[13px] mb-4" aria-label="Breadcrumb">
-      {showHome && (
-        <>
+    <nav aria-label="Breadcrumb" className={cn('mb-4', className)}>
+      <ol className="flex items-center gap-1 text-sm">
+        <li>
           <Link
             href="/dashboard"
-            className="flex items-center text-[rgba(232,236,255,0.5)] hover:text-white transition-colors"
+            className="flex items-center text-text-secondary hover:text-text-primary transition-colors"
           >
             <Home className="h-4 w-4" />
           </Link>
-          {breadcrumbs.length > 0 && (
-            <ChevronRight className="h-4 w-4 text-[rgba(232,236,255,0.3)]" />
-          )}
-        </>
-      )}
-
-      {breadcrumbs.map((item, index) => {
-        const isLast = index === breadcrumbs.length - 1
-
-        return (
-          <div key={item.href || item.label} className="flex items-center gap-1">
-            {index > 0 && (
-              <ChevronRight className="h-4 w-4 text-[rgba(232,236,255,0.3)]" />
-            )}
-            {item.href && !isLast ? (
+        </li>
+        {breadcrumbItems.map((item, index) => (
+          <li key={index} className="flex items-center gap-1">
+            <ChevronRight className="h-4 w-4 text-text-muted" />
+            {item.href && index < breadcrumbItems.length - 1 ? (
               <Link
                 href={item.href}
-                className="text-[rgba(232,236,255,0.5)] hover:text-white transition-colors"
+                className="text-text-secondary hover:text-text-primary transition-colors"
               >
                 {item.label}
               </Link>
             ) : (
-              <span className={isLast ? 'text-white font-medium' : 'text-[rgba(232,236,255,0.5)]'}>
-                {item.label}
-              </span>
+              <span className="text-text-primary font-medium">{item.label}</span>
             )}
-          </div>
-        )
-      })}
+          </li>
+        ))}
+      </ol>
     </nav>
   )
 }
 
 function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const segments = pathname.split('/').filter(Boolean)
-  const breadcrumbs: BreadcrumbItem[] = []
+  const items: BreadcrumbItem[] = []
 
   let currentPath = ''
-
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i]
     currentPath += `/${segment}`
 
-    // Skip UUID segments (show as "Details" or similar)
+    // Skip UUIDs in breadcrumb labels but keep the path
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)
 
-    let label: string
     if (isUuid) {
-      // For UUIDs, use a generic label based on the previous segment
-      const prevSegment = segments[i - 1]
-      if (prevSegment === 'documents') {
-        label = 'Invoice Details'
-      } else if (prevSegment === 'customers') {
-        label = 'Customer Details'
-      } else if (prevSegment === 'projects') {
-        label = 'Project Details'
-      } else if (prevSegment === 'timesheets') {
-        label = 'Timesheet Details'
-      } else {
-        label = 'Details'
-      }
+      items.push({
+        label: 'Details',
+        href: currentPath,
+      })
     } else {
-      label = routeLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
+      items.push({
+        label: routeLabels[segment] || capitalize(segment),
+        href: currentPath,
+      })
     }
-
-    breadcrumbs.push({
-      label,
-      href: i < segments.length - 1 ? currentPath : undefined,
-    })
   }
 
-  return breadcrumbs
+  return items
 }
 
-// Export a helper to use in page components
-export function useBreadcrumbs() {
-  const pathname = usePathname()
-  return generateBreadcrumbs(pathname)
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1).replace(/-/g, ' ')
 }

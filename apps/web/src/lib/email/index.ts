@@ -1,50 +1,94 @@
-'use server'
-
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
-
-const FROM_EMAIL = process.env.FROM_EMAIL || 'BOTFORCE Unity <noreply@botforce.at>'
+import { env } from '@/lib/env'
 
 export interface EmailOptions {
   to: string | string[]
   subject: string
   html: string
   text?: string
-  attachments?: Array<{
+  from?: string
+  replyTo?: string
+  attachments?: {
     filename: string
-    content: Buffer | string
+    content: string | Buffer
     contentType?: string
-  }>
+  }[]
 }
 
-export async function sendEmail(options: EmailOptions) {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY not set, skipping email send')
-    return { success: false, error: 'Email service not configured' }
+export interface EmailResult {
+  success: boolean
+  messageId?: string
+  error?: string
+}
+
+/**
+ * Send an email using the configured email provider
+ * Supports Resend, SendGrid, or SMTP via environment variables
+ */
+export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
+  const provider = env.EMAIL_PROVIDER || 'console'
+
+  switch (provider) {
+    case 'resend':
+      return sendWithResend(options)
+    case 'console':
+    default:
+      return sendToConsole(options)
+  }
+}
+
+async function sendWithResend(options: EmailOptions): Promise<EmailResult> {
+  const apiKey = env.RESEND_API_KEY
+
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured')
+    return { success: false, error: 'Email provider not configured' }
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-      attachments: options.attachments?.map((a) => ({
-        filename: a.filename,
-        content: typeof a.content === 'string' ? Buffer.from(a.content) : a.content,
-      })),
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: options.from || env.EMAIL_FROM || 'BOTFORCE Unity <noreply@botforce.io>',
+        to: Array.isArray(options.to) ? options.to : [options.to],
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        reply_to: options.replyTo,
+        attachments: options.attachments?.map((a) => ({
+          filename: a.filename,
+          content: typeof a.content === 'string' ? a.content : a.content.toString('base64'),
+        })),
+      }),
     })
 
-    if (error) {
-      console.error('Error sending email:', error)
-      return { success: false, error: error.message }
+    if (!response.ok) {
+      const error = await response.json()
+      console.error('Resend error:', error)
+      return { success: false, error: error.message || 'Failed to send email' }
     }
 
-    return { success: true, data }
+    const data = await response.json()
+    return { success: true, messageId: data.id }
   } catch (error) {
-    console.error('Error sending email:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    console.error('Email send error:', error)
+    return { success: false, error: 'Failed to send email' }
   }
+}
+
+async function sendToConsole(options: EmailOptions): Promise<EmailResult> {
+  console.log('=== EMAIL (Console Mode) ===')
+  console.log('To:', options.to)
+  console.log('Subject:', options.subject)
+  console.log('From:', options.from || 'default')
+  console.log('HTML length:', options.html.length)
+  if (options.attachments) {
+    console.log('Attachments:', options.attachments.map((a) => a.filename))
+  }
+  console.log('============================')
+
+  return { success: true, messageId: `console-${Date.now()}` }
 }

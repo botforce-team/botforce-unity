@@ -2,494 +2,355 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { z } from 'zod'
-import { addDays, addWeeks, addMonths, addQuarters, addYears } from 'date-fns'
+import type {
+  RecurringInvoiceTemplate,
+  RecurringInvoiceLine,
+  RecurringFrequency,
+  TaxRate,
+  ActionResult,
+  PaginatedResult,
+} from '@/types'
 
-interface CompanyMembership {
-  company_id: string
-  role: string
+export interface RecurringInvoicesFilter {
+  customerId?: string
+  isActive?: boolean
+  page?: number
+  limit?: number
 }
 
-type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
-
-const recurringLineSchema = z.object({
-  description: z.string().min(1),
-  quantity: z.number().positive(),
-  unit: z.string().default('pcs'),
-  unit_price: z.number().min(0),
-  tax_rate: z.enum(['standard_20', 'reduced_10', 'zero']).default('standard_20'),
-  project_id: z.string().uuid().optional(),
-})
-
-const recurringTemplateSchema = z.object({
-  customer_id: z.string().uuid(),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  frequency: z.enum(['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']),
-  day_of_month: z.number().min(1).max(28).optional(),
-  day_of_week: z.number().min(0).max(6).optional(),
-  payment_terms_days: z.number().int().positive().default(14),
-  notes: z.string().optional(),
-  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  lines: z.array(recurringLineSchema).min(1),
-})
-
-function calculateNextIssueDate(frequency: RecurrenceFrequency, startDate: Date, dayOfMonth?: number): Date {
-  const today = new Date()
-  let nextDate = new Date(startDate)
-
-  // If start date is in the past, calculate next occurrence
-  while (nextDate <= today) {
-    switch (frequency) {
-      case 'weekly':
-        nextDate = addWeeks(nextDate, 1)
-        break
-      case 'biweekly':
-        nextDate = addWeeks(nextDate, 2)
-        break
-      case 'monthly':
-        nextDate = addMonths(nextDate, 1)
-        if (dayOfMonth) {
-          nextDate.setDate(Math.min(dayOfMonth, new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()))
-        }
-        break
-      case 'quarterly':
-        nextDate = addQuarters(nextDate, 1)
-        if (dayOfMonth) {
-          nextDate.setDate(Math.min(dayOfMonth, new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()))
-        }
-        break
-      case 'yearly':
-        nextDate = addYears(nextDate, 1)
-        if (dayOfMonth) {
-          nextDate.setDate(Math.min(dayOfMonth, new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()))
-        }
-        break
-    }
-  }
-
-  return nextDate
+type RecurringTemplateWithRelations = RecurringInvoiceTemplate & {
+  customer?: { name: string }
 }
 
-export async function createRecurringTemplate(formData: FormData) {
-  const supabase = createClient()
+export async function getRecurringInvoices(
+  filter: RecurringInvoicesFilter = {}
+): Promise<PaginatedResult<RecurringTemplateWithRelations>> {
+  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
+  const { customerId, isActive, page = 1, limit = 50 } = filter
 
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can create recurring invoices' }
-  }
-
-  // Parse JSON data from form
-  const jsonData = formData.get('data') as string
-  let rawData
-  try {
-    rawData = JSON.parse(jsonData)
-  } catch {
-    return { error: 'Invalid JSON data' }
-  }
-
-  const result = recurringTemplateSchema.safeParse(rawData)
-  if (!result.success) {
-    return { error: 'Invalid input', details: result.error.flatten() }
-  }
-
-  const {
-    customer_id,
-    name,
-    description,
-    frequency,
-    day_of_month,
-    day_of_week,
-    payment_terms_days,
-    notes,
-    start_date,
-    lines,
-  } = result.data
-
-  const nextIssueDate = calculateNextIssueDate(
-    frequency,
-    new Date(start_date),
-    day_of_month
-  )
-
-  // Create template
-  const { data: template, error: templateError } = await supabase
+  let query = supabase
     .from('recurring_invoice_templates')
-    .insert({
-      company_id: membership.company_id,
-      customer_id,
-      name,
-      description,
-      frequency,
-      day_of_month: day_of_month || null,
-      day_of_week: day_of_week ?? null,
-      payment_terms_days,
-      notes,
-      next_issue_date: nextIssueDate.toISOString().split('T')[0],
-      created_by: user.id,
-      is_active: true,
-    } as never)
-    .select()
-    .single()
+    .select('*, customer:customers(name)', { count: 'exact' })
 
-  if (templateError || !template) {
-    console.error('Error creating recurring template:', templateError)
-    return { error: templateError?.message || 'Failed to create template' }
+  if (customerId) {
+    query = query.eq('customer_id', customerId)
   }
 
-  // Create lines
-  const lineInserts = lines.map((line, index) => ({
-    company_id: membership.company_id,
-    template_id: (template as any).id,
-    line_number: index + 1,
-    description: line.description,
-    quantity: line.quantity,
-    unit: line.unit,
-    unit_price: line.unit_price,
-    tax_rate: line.tax_rate,
-    project_id: line.project_id || null,
-  }))
-
-  const { error: linesError } = await supabase
-    .from('recurring_invoice_lines')
-    .insert(lineInserts as never)
-
-  if (linesError) {
-    console.error('Error creating recurring lines:', linesError)
-    // Clean up template
-    await supabase.from('recurring_invoice_templates').delete().eq('id', (template as any).id)
-    return { error: linesError.message }
+  if (isActive !== undefined) {
+    query = query.eq('is_active', isActive)
   }
 
-  revalidatePath('/documents')
-  return { data: template }
-}
+  query = query.order('created_at', { ascending: false })
 
-export async function updateRecurringTemplate(id: string, formData: FormData) {
-  const supabase = createClient()
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+  query = query.range(from, to)
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can update recurring invoices' }
-  }
-
-  // Parse JSON data from form
-  const jsonData = formData.get('data') as string
-  let rawData
-  try {
-    rawData = JSON.parse(jsonData)
-  } catch {
-    return { error: 'Invalid JSON data' }
-  }
-
-  const result = recurringTemplateSchema.safeParse(rawData)
-  if (!result.success) {
-    return { error: 'Invalid input', details: result.error.flatten() }
-  }
-
-  const {
-    customer_id,
-    name,
-    description,
-    frequency,
-    day_of_month,
-    day_of_week,
-    payment_terms_days,
-    notes,
-    start_date,
-    lines,
-  } = result.data
-
-  const nextIssueDate = calculateNextIssueDate(
-    frequency,
-    new Date(start_date),
-    day_of_month
-  )
-
-  // Update template
-  const { error: templateError } = await supabase
-    .from('recurring_invoice_templates')
-    .update({
-      customer_id,
-      name,
-      description,
-      frequency,
-      day_of_month: day_of_month || null,
-      day_of_week: day_of_week ?? null,
-      payment_terms_days,
-      notes,
-      next_issue_date: nextIssueDate.toISOString().split('T')[0],
-    } as never)
-    .eq('id', id)
-    .eq('company_id', membership.company_id)
-
-  if (templateError) {
-    console.error('Error updating recurring template:', templateError)
-    return { error: templateError.message }
-  }
-
-  // Delete existing lines and recreate
-  await supabase
-    .from('recurring_invoice_lines')
-    .delete()
-    .eq('template_id', id)
-
-  const lineInserts = lines.map((line, index) => ({
-    company_id: membership.company_id,
-    template_id: id,
-    line_number: index + 1,
-    description: line.description,
-    quantity: line.quantity,
-    unit: line.unit,
-    unit_price: line.unit_price,
-    tax_rate: line.tax_rate,
-    project_id: line.project_id || null,
-  }))
-
-  const { error: linesError } = await supabase
-    .from('recurring_invoice_lines')
-    .insert(lineInserts as never)
-
-  if (linesError) {
-    console.error('Error updating recurring lines:', linesError)
-    return { error: linesError.message }
-  }
-
-  revalidatePath('/documents')
-  return { success: true }
-}
-
-export async function toggleRecurringTemplate(id: string, isActive: boolean) {
-  const supabase = createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can modify recurring invoices' }
-  }
-
-  const { error } = await supabase
-    .from('recurring_invoice_templates')
-    .update({ is_active: isActive } as never)
-    .eq('id', id)
-    .eq('company_id', membership.company_id)
+  const { data, error, count } = await query
 
   if (error) {
-    console.error('Error toggling recurring template:', error)
-    return { error: error.message }
+    console.error('Error fetching recurring invoices:', error)
+    return { data: [], total: 0, page, limit, totalPages: 0 }
   }
 
-  revalidatePath('/documents')
-  return { success: true }
+  const total = count || 0
+  const totalPages = Math.ceil(total / limit)
+
+  return {
+    data: data as RecurringTemplateWithRelations[],
+    total,
+    page,
+    limit,
+    totalPages,
+  }
 }
 
-export async function deleteRecurringTemplate(id: string) {
-  const supabase = createClient()
+export async function getRecurringInvoice(
+  id: string
+): Promise<RecurringTemplateWithRelations | null> {
+  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can delete recurring invoices' }
-  }
-
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('recurring_invoice_templates')
-    .delete()
+    .select('*, customer:customers(name), lines:recurring_invoice_lines(*)')
     .eq('id', id)
-    .eq('company_id', membership.company_id)
+    .single()
 
   if (error) {
-    console.error('Error deleting recurring template:', error)
-    return { error: error.message }
+    console.error('Error fetching recurring invoice:', error)
+    return null
   }
 
-  revalidatePath('/documents')
-  return { success: true }
+  return data as RecurringTemplateWithRelations
 }
 
-export async function generateInvoiceFromTemplate(templateId: string) {
-  const supabase = createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can generate invoices' }
-  }
-
-  // Get template with lines
-  const { data: template, error: templateError } = await supabase
-    .from('recurring_invoice_templates')
-    .select(`
-      *,
-      lines:recurring_invoice_lines(*)
-    `)
-    .eq('id', templateId)
-    .eq('company_id', membership.company_id)
-    .single()
-
-  if (templateError || !template) {
-    return { error: 'Template not found' }
-  }
-
-  const t = template as any
-
-  // Create draft invoice
-  const { data: document, error: docError } = await supabase
-    .from('documents')
-    .insert({
-      company_id: membership.company_id,
-      customer_id: t.customer_id,
-      document_type: 'invoice',
-      status: 'draft',
-      payment_terms_days: t.payment_terms_days,
-      notes: t.notes,
-      recurring_template_id: templateId,
-    } as never)
-    .select()
-    .single()
-
-  if (docError || !document) {
-    console.error('Error creating invoice from template:', docError)
-    return { error: docError?.message || 'Failed to create invoice' }
-  }
-
-  // Create document lines
-  const lineInserts = (t.lines as any[]).map((line: any) => ({
-    company_id: membership.company_id,
-    document_id: (document as any).id,
-    line_number: line.line_number,
-    description: line.description,
-    quantity: line.quantity,
-    unit: line.unit,
-    unit_price: line.unit_price,
-    tax_rate: line.tax_rate,
-    project_id: line.project_id,
-  }))
-
-  const { error: linesError } = await supabase
-    .from('document_lines')
-    .insert(lineInserts as never)
-
-  if (linesError) {
-    console.error('Error creating document lines:', linesError)
-    // Clean up document
-    await supabase.from('documents').delete().eq('id', (document as any).id)
-    return { error: linesError.message }
-  }
-
-  // Update template's last issued date
-  await supabase
-    .from('recurring_invoice_templates')
-    .update({ last_issued_at: new Date().toISOString() } as never)
-    .eq('id', templateId)
-
-  revalidatePath('/documents')
-  return { data: document }
+export interface CreateRecurringLineInput {
+  description: string
+  quantity: number
+  unit: string
+  unit_price: number
+  tax_rate: TaxRate
+  project_id?: string | null
 }
 
-export async function getRecurringTemplates() {
-  const supabase = createClient()
+export interface CreateRecurringInvoiceInput {
+  customer_id: string
+  name: string
+  description?: string | null
+  frequency: RecurringFrequency
+  day_of_month?: number | null
+  day_of_week?: number | null
+  payment_terms_days?: number
+  notes?: string | null
+  is_active?: boolean
+  next_issue_date?: string | null
+  lines: CreateRecurringLineInput[]
+}
 
-  const { data: { user } } = await supabase.auth.getUser()
+function calculateTax(amount: number, taxRate: TaxRate): number {
+  const taxRates: Record<TaxRate, number> = {
+    standard_20: 0.20,
+    reduced_10: 0.10,
+    zero: 0,
+    reverse_charge: 0,
+  }
+  return Math.round(amount * taxRates[taxRate] * 100) / 100
+}
+
+export async function createRecurringInvoice(
+  input: CreateRecurringInvoiceInput
+): Promise<ActionResult<RecurringInvoiceTemplate>> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) {
-    return { error: 'Unauthorized' }
+    return { success: false, error: 'Not authenticated' }
   }
 
-  // Get user's company
-  const { data: membershipData } = await supabase
+  const { data: membership } = await supabase
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
-  const membership = membershipData as { company_id: string } | null
-
   if (!membership) {
-    return { error: 'No company membership found' }
+    return { success: false, error: 'No company membership found' }
   }
 
-  const { data: templates, error } = await supabase
+  // Calculate totals
+  let subtotal = 0
+  let totalTax = 0
+
+  const processedLines = input.lines.map((line, index) => {
+    const lineSubtotal = Math.round(line.quantity * line.unit_price * 100) / 100
+    const lineTax = calculateTax(lineSubtotal, line.tax_rate)
+    subtotal += lineSubtotal
+    totalTax += lineTax
+
+    return {
+      ...line,
+      line_number: index + 1,
+    }
+  })
+
+  const total = subtotal + totalTax
+
+  // Create template
+  const { data: template, error: templateError } = await supabase
     .from('recurring_invoice_templates')
-    .select(`
-      *,
-      customer:customers(name),
-      lines:recurring_invoice_lines(*)
-    `)
-    .eq('company_id', membership.company_id)
-    .order('created_at', { ascending: false })
+    .insert({
+      company_id: membership.company_id,
+      customer_id: input.customer_id,
+      name: input.name,
+      description: input.description || null,
+      frequency: input.frequency,
+      day_of_month: input.day_of_month || null,
+      day_of_week: input.day_of_week || null,
+      payment_terms_days: input.payment_terms_days || 14,
+      notes: input.notes || null,
+      is_active: input.is_active ?? true,
+      next_issue_date: input.next_issue_date || null,
+      subtotal,
+      tax_amount: totalTax,
+      total,
+    })
+    .select()
+    .single()
+
+  if (templateError) {
+    console.error('Error creating recurring invoice:', templateError)
+    return { success: false, error: templateError.message }
+  }
+
+  // Create lines
+  const linesWithTemplateId = processedLines.map((line) => ({
+    template_id: template.id,
+    line_number: line.line_number,
+    description: line.description,
+    quantity: line.quantity,
+    unit: line.unit,
+    unit_price: line.unit_price,
+    tax_rate: line.tax_rate,
+    project_id: line.project_id || null,
+  }))
+
+  const { error: linesError } = await supabase
+    .from('recurring_invoice_lines')
+    .insert(linesWithTemplateId)
+
+  if (linesError) {
+    console.error('Error creating recurring invoice lines:', linesError)
+    await supabase.from('recurring_invoice_templates').delete().eq('id', template.id)
+    return { success: false, error: linesError.message }
+  }
+
+  revalidatePath('/documents/recurring')
+  return { success: true, data: template as RecurringInvoiceTemplate }
+}
+
+export async function updateRecurringInvoice(
+  id: string,
+  input: Partial<Omit<CreateRecurringInvoiceInput, 'lines'>> & { lines?: CreateRecurringLineInput[] }
+): Promise<ActionResult<RecurringInvoiceTemplate>> {
+  const supabase = await createClient()
+
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.customer_id) updateData.customer_id = input.customer_id
+  if (input.name) updateData.name = input.name
+  if (input.description !== undefined) updateData.description = input.description
+  if (input.frequency) updateData.frequency = input.frequency
+  if (input.day_of_month !== undefined) updateData.day_of_month = input.day_of_month
+  if (input.day_of_week !== undefined) updateData.day_of_week = input.day_of_week
+  if (input.payment_terms_days !== undefined) updateData.payment_terms_days = input.payment_terms_days
+  if (input.notes !== undefined) updateData.notes = input.notes
+  if (input.is_active !== undefined) updateData.is_active = input.is_active
+  if (input.next_issue_date !== undefined) updateData.next_issue_date = input.next_issue_date
+
+  // If lines are provided, recalculate totals
+  if (input.lines) {
+    let subtotal = 0
+    let totalTax = 0
+
+    const processedLines = input.lines.map((line, index) => {
+      const lineSubtotal = Math.round(line.quantity * line.unit_price * 100) / 100
+      const lineTax = calculateTax(lineSubtotal, line.tax_rate)
+      subtotal += lineSubtotal
+      totalTax += lineTax
+
+      return {
+        template_id: id,
+        line_number: index + 1,
+        description: line.description,
+        quantity: line.quantity,
+        unit: line.unit,
+        unit_price: line.unit_price,
+        tax_rate: line.tax_rate,
+        project_id: line.project_id || null,
+      }
+    })
+
+    updateData.subtotal = subtotal
+    updateData.tax_amount = totalTax
+    updateData.total = subtotal + totalTax
+
+    // Delete existing lines
+    await supabase.from('recurring_invoice_lines').delete().eq('template_id', id)
+
+    // Insert new lines
+    const { error: linesError } = await supabase
+      .from('recurring_invoice_lines')
+      .insert(processedLines)
+
+    if (linesError) {
+      console.error('Error updating recurring invoice lines:', linesError)
+      return { success: false, error: linesError.message }
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('recurring_invoice_templates')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
 
   if (error) {
-    console.error('Error fetching recurring templates:', error)
-    return { error: error.message }
+    console.error('Error updating recurring invoice:', error)
+    return { success: false, error: error.message }
   }
 
-  return { data: templates }
+  revalidatePath('/documents/recurring')
+  revalidatePath(`/documents/recurring/${id}`)
+  return { success: true, data: data as RecurringInvoiceTemplate }
+}
+
+export async function deleteRecurringInvoice(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // Delete lines first
+  await supabase.from('recurring_invoice_lines').delete().eq('template_id', id)
+
+  const { error } = await supabase
+    .from('recurring_invoice_templates')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting recurring invoice:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/documents/recurring')
+  return { success: true }
+}
+
+export async function toggleRecurringInvoiceActive(
+  id: string,
+  isActive: boolean
+): Promise<ActionResult<RecurringInvoiceTemplate>> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('recurring_invoice_templates')
+    .update({
+      is_active: isActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error toggling recurring invoice status:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/documents/recurring')
+  return { success: true, data: data as RecurringInvoiceTemplate }
+}
+
+// Get customers for dropdown
+export async function getCustomersForRecurringSelect(): Promise<{ value: string; label: string }[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('customers')
+    .select('id, name')
+    .eq('is_active', true)
+    .order('name')
+
+  if (error) {
+    console.error('Error fetching customers:', error)
+    return []
+  }
+
+  return data.map((c) => ({ value: c.id, label: c.name }))
 }

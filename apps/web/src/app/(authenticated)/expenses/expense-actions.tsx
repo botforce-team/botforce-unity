@@ -1,301 +1,216 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import Link from 'next/link'
+import { MoreHorizontal, Pencil, Trash2, Send, Check, X } from 'lucide-react'
+import { Button } from '@/components/ui'
 import {
+  deleteExpense,
+  submitExpense,
   approveExpense,
   rejectExpense,
-  submitExpense,
-  deleteExpense,
-  getReceiptUrl,
-  uploadReceipt,
 } from '@/app/actions/expenses'
-import { Eye, Upload, Loader2 } from 'lucide-react'
+import type { Expense } from '@/types'
 
-export function SubmitExpenseButton({ expenseId }: { expenseId: string }) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-
-  async function handleSubmit() {
-    setLoading(true)
-    const result = await submitExpense(expenseId)
-    if (result.error) {
-      alert(result.error)
-    } else {
-      router.refresh()
-    }
-    setLoading(false)
-  }
-
-  return (
-    <button
-      onClick={handleSubmit}
-      disabled={loading}
-      className="rounded-[8px] px-3 py-1 text-[12px] font-medium text-[#1f5bff] disabled:opacity-50"
-      style={{
-        background: 'rgba(31, 91, 255, 0.12)',
-        border: '1px solid rgba(31, 91, 255, 0.35)',
-      }}
-    >
-      {loading ? '...' : 'Submit'}
-    </button>
-  )
+interface ExpenseActionsProps {
+  expense: Expense
+  isAdmin?: boolean
 }
 
-export function ApproveExpenseButton({ expenseId }: { expenseId: string }) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
+export function ExpenseActions({ expense, isAdmin }: ExpenseActionsProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showRejectForm, setShowRejectForm] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
-  async function handleApprove() {
-    setLoading(true)
-    const result = await approveExpense(expenseId)
-    if (result.error) {
-      alert(result.error)
-    } else {
-      router.refresh()
-    }
-    setLoading(false)
+  const handleSubmit = () => {
+    startTransition(async () => {
+      const result = await submitExpense(expense.id)
+      if (!result.success) {
+        alert(result.error)
+      }
+      setIsOpen(false)
+    })
   }
 
-  return (
-    <button
-      onClick={handleApprove}
-      disabled={loading}
-      className="rounded-[8px] px-3 py-1 text-[12px] font-medium text-[#22c55e] disabled:opacity-50"
-      style={{
-        background: 'rgba(34, 197, 94, 0.12)',
-        border: '1px solid rgba(34, 197, 94, 0.35)',
-      }}
-    >
-      {loading ? '...' : 'Approve'}
-    </button>
-  )
-}
+  const handleApprove = () => {
+    startTransition(async () => {
+      const result = await approveExpense(expense.id)
+      if (!result.success) {
+        alert(result.error)
+      }
+      setIsOpen(false)
+    })
+  }
 
-export function RejectExpenseButton({ expenseId }: { expenseId: string }) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [showReasonInput, setShowReasonInput] = useState(false)
-  const [reason, setReason] = useState('')
-
-  async function handleReject() {
-    if (!showReasonInput) {
-      setShowReasonInput(true)
+  const handleReject = () => {
+    if (!rejectReason.trim()) {
+      alert('Please provide a reason for rejection')
       return
     }
-
-    if (!reason.trim()) {
-      alert('Please provide a rejection reason')
-      return
-    }
-
-    setLoading(true)
-    const result = await rejectExpense(expenseId, reason)
-    if (result.error) {
-      alert(result.error)
-    } else {
-      router.refresh()
-    }
-    setLoading(false)
-    setShowReasonInput(false)
-    setReason('')
+    startTransition(async () => {
+      const result = await rejectExpense(expense.id, rejectReason)
+      if (!result.success) {
+        alert(result.error)
+      }
+      setShowRejectForm(false)
+      setIsOpen(false)
+    })
   }
 
-  if (showReasonInput) {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Rejection reason"
-          className="w-32 rounded-[6px] px-2 py-1 text-[11px]"
-          style={{
-            background: 'rgba(0, 0, 0, 0.25)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            color: '#e8ecff',
-          }}
-          autoFocus
-        />
-        <button
-          onClick={handleReject}
-          disabled={loading}
-          className="rounded-[6px] px-2 py-1 text-[11px] font-medium text-[#ef4444] disabled:opacity-50"
-          style={{
-            background: 'rgba(239, 68, 68, 0.12)',
-            border: '1px solid rgba(239, 68, 68, 0.35)',
-          }}
-        >
-          {loading ? '...' : 'Confirm'}
-        </button>
-        <button
-          onClick={() => {
-            setShowReasonInput(false)
-            setReason('')
-          }}
-          className="rounded-[6px] px-2 py-1 text-[11px] text-[rgba(232,236,255,0.6)]"
-        >
-          Cancel
-        </button>
-      </div>
-    )
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deleteExpense(expense.id)
+      if (!result.success) {
+        alert(result.error)
+      }
+      setShowDeleteConfirm(false)
+      setIsOpen(false)
+    })
   }
+
+  const canEdit = expense.status === 'draft' || expense.status === 'rejected'
+  const canSubmit = expense.status === 'draft'
+  const canApprove = isAdmin && expense.status === 'submitted'
+  const canDelete = expense.status === 'draft' || expense.status === 'rejected'
 
   return (
-    <button
-      onClick={handleReject}
-      disabled={loading}
-      className="rounded-[8px] px-3 py-1 text-[12px] font-medium text-[#ef4444] disabled:opacity-50"
-      style={{
-        background: 'rgba(239, 68, 68, 0.12)',
-        border: '1px solid rgba(239, 68, 68, 0.35)',
-      }}
-    >
-      Reject
-    </button>
-  )
-}
-
-export function DeleteExpenseButton({ expenseId }: { expenseId: string }) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-
-  async function handleDelete() {
-    setLoading(true)
-    const result = await deleteExpense(expenseId)
-    if (result.error) {
-      alert(result.error)
-    } else {
-      router.refresh()
-    }
-    setLoading(false)
-    setShowConfirm(false)
-  }
-
-  if (showConfirm) {
-    return (
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleDelete}
-          disabled={loading}
-          className="rounded-[6px] px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
-          style={{ background: '#ef4444' }}
-        >
-          {loading ? '...' : 'Delete'}
-        </button>
-        <button
-          onClick={() => setShowConfirm(false)}
-          className="rounded-[6px] px-2 py-1 text-[11px] text-[rgba(232,236,255,0.6)]"
-        >
-          Cancel
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <button
-      onClick={() => setShowConfirm(true)}
-      className="rounded-[8px] px-3 py-1 text-[12px] font-medium text-[rgba(232,236,255,0.5)] hover:text-[#ef4444]"
-      style={{
-        background: 'rgba(255, 255, 255, 0.04)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-      }}
-    >
-      Delete
-    </button>
-  )
-}
-
-export function ViewReceiptButton({ expenseId }: { expenseId: string }) {
-  const [loading, setLoading] = useState(false)
-
-  async function handleView() {
-    setLoading(true)
-    const result = await getReceiptUrl(expenseId)
-    setLoading(false)
-
-    if (result.error) {
-      alert(result.error)
-      return
-    }
-
-    if (result.url) {
-      window.open(result.url, '_blank')
-    }
-  }
-
-  return (
-    <button
-      onClick={handleView}
-      disabled={loading}
-      className="rounded-[6px] p-1.5 text-[#22c55e] transition-colors hover:bg-[rgba(34,197,94,0.15)] disabled:opacity-50"
-      title="View receipt"
-    >
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-    </button>
-  )
-}
-
-export function UploadReceiptButton({ expenseId }: { expenseId: string }) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
-  const MAX_SIZE = 5 * 1024 * 1024
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Invalid file type. Allowed: JPEG, PNG, GIF, WebP, PDF')
-      return
-    }
-
-    if (file.size > MAX_SIZE) {
-      alert('File too large. Maximum size is 5MB')
-      return
-    }
-
-    setLoading(true)
-    const formData = new FormData()
-    formData.set('file', file)
-
-    const result = await uploadReceipt(expenseId, formData)
-    setLoading(false)
-
-    if (result.error) {
-      alert(result.error)
-    } else {
-      router.refresh()
-    }
-
-    // Reset input
-    if (inputRef.current) {
-      inputRef.current.value = ''
-    }
-  }
-
-  return (
-    <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ALLOWED_TYPES.join(',')}
-        onChange={handleFileChange}
-        className="hidden"
-      />
-      <button
-        onClick={() => inputRef.current?.click()}
-        disabled={loading}
-        className="rounded-[6px] p-1.5 text-[rgba(232,236,255,0.4)] transition-colors hover:bg-[rgba(31,91,255,0.15)] hover:text-[#1f5bff] disabled:opacity-50"
-        title="Upload receipt"
+    <div className="relative">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isPending}
       >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-      </button>
-    </>
+        <MoreHorizontal className="h-4 w-4" />
+      </Button>
+
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setIsOpen(false)
+              setShowDeleteConfirm(false)
+              setShowRejectForm(false)
+            }}
+          />
+          <div className="absolute right-0 z-50 mt-1 w-56 rounded-md border border-border bg-surface shadow-lg">
+            {showDeleteConfirm ? (
+              <div className="p-3">
+                <p className="text-sm text-text-primary mb-3">Delete this expense?</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={isPending}
+                  >
+                    {isPending ? 'Deleting...' : 'Delete'}
+                  </Button>
+                </div>
+              </div>
+            ) : showRejectForm ? (
+              <div className="p-3">
+                <p className="text-sm text-text-primary mb-2">Rejection reason:</p>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-text-primary mb-3"
+                  rows={2}
+                  placeholder="Enter reason..."
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRejectForm(false)}
+                    disabled={isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleReject}
+                    disabled={isPending}
+                  >
+                    {isPending ? 'Rejecting...' : 'Reject'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="py-1">
+                {canEdit && (
+                  <Link
+                    href={`/expenses/${expense.id}/edit`}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-hover"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </Link>
+                )}
+                {canSubmit && (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isPending}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-hover disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4" />
+                    Submit for Approval
+                  </button>
+                )}
+                {canApprove && (
+                  <>
+                    <button
+                      onClick={handleApprove}
+                      disabled={isPending}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-success hover:bg-surface-hover disabled:opacity-50"
+                    >
+                      <Check className="h-4 w-4" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => setShowRejectForm(true)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-surface-hover"
+                    >
+                      <X className="h-4 w-4" />
+                      Reject
+                    </button>
+                  </>
+                )}
+                {canDelete && (
+                  <>
+                    <hr className="my-1 border-border" />
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-surface-hover"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </>
+                )}
+                {!canEdit && !canSubmit && !canApprove && !canDelete && (
+                  <div className="px-3 py-2 text-sm text-text-muted">
+                    No actions available
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   )
 }

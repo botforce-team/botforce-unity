@@ -1,448 +1,266 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import {
-  ArrowLeft,
+  Pencil,
   Mail,
   Phone,
   MapPin,
-  Globe,
-  FolderKanban,
-  Edit,
-  AlertCircle,
+  Building,
+  CreditCard,
+  Clock,
+  FileText,
+  FolderOpen
 } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/utils'
-import { DeleteCustomerButton } from './actions'
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import { getCustomer } from '@/app/actions/customers'
+import { createClient } from '@/lib/supabase/server'
 
-interface CompanyMembership {
-  company_id: string
-  role: string
+interface CustomerDetailPageProps {
+  params: Promise<{ id: string }>
 }
 
-interface Customer {
-  id: string
-  name: string
-  email: string | null
-  phone: string | null
-  website: string | null
-  vat_number: string | null
-  reverse_charge: boolean
-  address_line1: string | null
-  address_line2: string | null
-  city: string | null
-  postal_code: string | null
-  country: string | null
+const taxRateLabels: Record<string, string> = {
+  standard_20: '20% (Standard)',
+  reduced_10: '10% (Reduced)',
+  zero: '0% (Tax Exempt)',
+  reverse_charge: 'Reverse Charge',
 }
 
-interface Project {
-  id: string
-  name: string
-  code: string | null
-  is_active: boolean
-  created_at: string
-}
-
-interface Invoice {
-  id: string
-  document_number: string | null
-  issue_date: string | null
-  total: number
-  status: string
-}
-
-export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  // Get user's company membership
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership) {
-    return (
-      <div className="py-12 text-center">
-        <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
-      </div>
-    )
-  }
-
-  const isAdmin = membership.role === 'superadmin'
-
-  // Fetch customer
-  const { data: customerData } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('id', params.id)
-    .eq('company_id', membership.company_id)
-    .single()
-
-  const customer = customerData as Customer | null
+export default async function CustomerDetailPage({ params }: CustomerDetailPageProps) {
+  const { id } = await params
+  const customer = await getCustomer(id)
 
   if (!customer) {
-    return (
-      <div className="py-12 text-center">
-        <p className="text-[rgba(232,236,255,0.6)]">Customer not found.</p>
-        <Link href="/customers" className="mt-2 inline-block text-[#1f5bff] hover:underline">
-          Back to Customers
-        </Link>
-      </div>
-    )
+    notFound()
   }
 
-  // Fetch projects for this customer
-  const { data: projectsData } = await supabase
+  const supabase = await createClient()
+
+  // Fetch related projects
+  const { data: projects } = await supabase
     .from('projects')
-    .select('*')
-    .eq('customer_id', customer.id)
-    .order('created_at', { ascending: false })
+    .select('id, name, code, is_active')
+    .eq('customer_id', id)
+    .order('name')
 
-  const projects = (projectsData || []) as Project[]
-
-  // Fetch invoices for this customer
-  const { data: invoicesData } = await supabase
+  // Fetch recent documents
+  const { data: documents } = await supabase
     .from('documents')
-    .select('*')
-    .eq('customer_id', customer.id)
-    .eq('document_type', 'invoice')
+    .select('id, document_number, document_type, status, total, created_at')
+    .eq('customer_id', id)
     .order('created_at', { ascending: false })
-    .limit(10)
-
-  const invoices = (invoicesData || []) as Invoice[]
-
-  // Calculate totals
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.total), 0)
-  const unpaidAmount = invoices
-    .filter((inv) => inv.status === 'issued')
-    .reduce((sum, inv) => sum + Number(inv.total), 0)
-
-  const cardStyle = {
-    background: 'rgba(255, 255, 255, 0.04)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-  }
-
-  function getStatusStyle(status: string) {
-    switch (status) {
-      case 'paid':
-        return {
-          background: 'rgba(34, 197, 94, 0.12)',
-          border: '1px solid rgba(34, 197, 94, 0.35)',
-          color: '#22c55e',
-        }
-      case 'issued':
-        return {
-          background: 'rgba(245, 158, 11, 0.12)',
-          border: '1px solid rgba(245, 158, 11, 0.35)',
-          color: '#f59e0b',
-        }
-      default:
-        return {
-          background: 'rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          color: 'rgba(255, 255, 255, 0.5)',
-        }
-    }
-  }
+    .limit(5)
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Link
-          href="/customers"
-          className="mb-4 inline-flex items-center gap-2 text-[13px] text-[rgba(232,236,255,0.6)] hover:text-white"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Customers
-        </Link>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div
-              className="flex h-14 w-14 items-center justify-center rounded-full"
-              style={{
-                background: 'rgba(139, 92, 246, 0.15)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-              }}
-            >
-              <span className="text-[20px] font-bold text-[#a78bfa]">
-                {customer.name.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">{customer.name}</h1>
-              <div className="mt-1 flex items-center gap-3">
-                {customer.vat_number && (
-                  <p className="text-[13px] text-[rgba(232,236,255,0.5)]">
-                    VAT: {customer.vat_number}
-                  </p>
-                )}
-                {customer.reverse_charge && (
-                  <span
-                    className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                    style={{
-                      background: 'rgba(245, 158, 11, 0.12)',
-                      border: '1px solid rgba(245, 158, 11, 0.35)',
-                      color: '#f59e0b',
-                    }}
-                  >
-                    <AlertCircle className="h-3 w-3" />
-                    Reverse Charge
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          {isAdmin && (
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/customers/${customer.id}/edit`}
-                className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-medium text-[rgba(232,236,255,0.8)]"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                }}
-              >
-                <Edit className="h-4 w-4" />
-                Edit
-              </Link>
-              <DeleteCustomerButton customerId={customer.id} />
-            </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">{customer.name}</h1>
+          {customer.legal_name && customer.legal_name !== customer.name && (
+            <p className="text-text-secondary">{customer.legal_name}</p>
           )}
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-[18px] p-5" style={cardStyle}>
-          <div className="text-2xl font-bold text-white">{projects?.length || 0}</div>
-          <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Projects</p>
-        </div>
-        <div className="rounded-[18px] p-5" style={cardStyle}>
-          <div className="text-2xl font-bold text-white">{invoices?.length || 0}</div>
-          <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Invoices</p>
-        </div>
-        <div className="rounded-[18px] p-5" style={cardStyle}>
-          <div className="text-2xl font-bold text-white">{formatCurrency(totalInvoiced)}</div>
-          <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Total Invoiced</p>
-        </div>
-        <div className="rounded-[18px] p-5" style={cardStyle}>
-          <div
-            className={`text-2xl font-bold ${unpaidAmount > 0 ? 'text-[#f59e0b]' : 'text-[#22c55e]'}`}
-          >
-            {formatCurrency(unpaidAmount)}
-          </div>
-          <p className="text-[13px] text-[rgba(232,236,255,0.6)]">Outstanding</p>
+        <div className="flex items-center gap-2">
+          <Badge variant={customer.is_active ? 'success' : 'secondary'}>
+            {customer.is_active ? 'Active' : 'Inactive'}
+          </Badge>
+          <Link href={`/customers/${id}/edit`}>
+            <Button variant="outline">
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          </Link>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Contact Info */}
-        <div className="overflow-hidden rounded-[18px]" style={cardStyle}>
-          <div className="border-b p-5" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
-            <h2 className="text-[15px] font-semibold text-white">Contact Information</h2>
-          </div>
-          <div className="space-y-4 p-5">
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Building className="h-5 w-5 text-text-secondary" />
+              Contact Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {customer.email && (
               <div className="flex items-center gap-3">
-                <Mail className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-                <a
-                  href={`mailto:${customer.email}`}
-                  className="text-[13px] text-[#1f5bff] hover:underline"
-                >
+                <Mail className="h-4 w-4 text-text-muted" />
+                <a href={`mailto:${customer.email}`} className="text-primary hover:underline">
                   {customer.email}
                 </a>
               </div>
             )}
             {customer.phone && (
               <div className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-                <a
-                  href={`tel:${customer.phone}`}
-                  className="text-[13px] text-[rgba(232,236,255,0.8)]"
-                >
+                <Phone className="h-4 w-4 text-text-muted" />
+                <a href={`tel:${customer.phone}`} className="hover:text-primary">
                   {customer.phone}
-                </a>
-              </div>
-            )}
-            {customer.website && (
-              <div className="flex items-center gap-3">
-                <Globe className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-                <a
-                  href={customer.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[13px] text-[#1f5bff] hover:underline"
-                >
-                  {customer.website}
                 </a>
               </div>
             )}
             {(customer.address_line1 || customer.city) && (
               <div className="flex items-start gap-3">
-                <MapPin className="mt-0.5 h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-                <div className="text-[13px] text-[rgba(232,236,255,0.8)]">
-                  {customer.address_line1 && <p>{customer.address_line1}</p>}
-                  {customer.address_line2 && <p>{customer.address_line2}</p>}
+                <MapPin className="h-4 w-4 text-text-muted mt-0.5" />
+                <div className="text-text-secondary">
+                  {customer.address_line1 && <div>{customer.address_line1}</div>}
+                  {customer.address_line2 && <div>{customer.address_line2}</div>}
                   {(customer.postal_code || customer.city) && (
-                    <p>{[customer.postal_code, customer.city].filter(Boolean).join(' ')}</p>
+                    <div>
+                      {customer.postal_code} {customer.city}
+                    </div>
                   )}
-                  {customer.country && <p>{customer.country}</p>}
+                  <div>{customer.country}</div>
                 </div>
               </div>
             )}
-            {!customer.email && !customer.phone && !customer.address_line1 && (
-              <p className="text-[13px] text-[rgba(232,236,255,0.5)]">No contact information</p>
-            )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Projects */}
-        <div className="overflow-hidden rounded-[18px] lg:col-span-2" style={cardStyle}>
-          <div
-            className="flex items-center justify-between border-b p-5"
-            style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}
-          >
-            <h2 className="text-[15px] font-semibold text-white">Projects</h2>
-            {isAdmin && (
-              <Link
-                href={`/projects/new?customer=${customer.id}`}
-                className="text-[12px] text-[#1f5bff] hover:underline"
-              >
-                + Add Project
-              </Link>
-            )}
-          </div>
-          <div className="p-5">
-            {!projects || projects.length === 0 ? (
-              <p className="py-4 text-center text-[13px] text-[rgba(232,236,255,0.5)]">
-                No projects yet
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {projects.map((project) => (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className="flex items-center justify-between rounded-[10px] p-3 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
-                  >
-                    <div className="flex items-center gap-3">
-                      <FolderKanban className="h-4 w-4 text-[rgba(232,236,255,0.5)]" />
-                      <div>
-                        <p className="text-[13px] font-medium text-white">{project.name}</p>
-                        {project.code && (
-                          <p className="text-[11px] text-[rgba(232,236,255,0.5)]">{project.code}</p>
-                        )}
-                      </div>
-                    </div>
-                    <span
-                      className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                      style={
-                        project.is_active
-                          ? {
-                              background: 'rgba(34, 197, 94, 0.12)',
-                              border: '1px solid rgba(34, 197, 94, 0.35)',
-                              color: '#22c55e',
-                            }
-                          : {
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
-                              color: 'rgba(255, 255, 255, 0.5)',
-                            }
-                      }
-                    >
-                      {project.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </Link>
-                ))}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-text-secondary" />
+              Billing Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {customer.vat_number && (
+              <div className="flex justify-between">
+                <span className="text-text-secondary">VAT Number</span>
+                <span className="font-medium">{customer.vat_number}</span>
               </div>
             )}
-          </div>
-        </div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Payment Terms</span>
+              <span className="font-medium">{customer.payment_terms_days} days</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Tax Rate</span>
+              <span className="font-medium">{taxRateLabels[customer.default_tax_rate]}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Currency</span>
+              <span className="font-medium">{customer.currency}</span>
+            </div>
+            {customer.tax_exempt && (
+              <Badge variant="warning">Tax Exempt</Badge>
+            )}
+            {customer.reverse_charge && (
+              <Badge variant="info">Reverse Charge</Badge>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Recent Invoices */}
-      <div className="overflow-hidden rounded-[18px]" style={cardStyle}>
-        <div
-          className="flex items-center justify-between border-b p-5"
-          style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}
-        >
-          <h2 className="text-[15px] font-semibold text-white">Recent Invoices</h2>
-          {isAdmin && (
-            <Link
-              href={`/documents/new?customer=${customer.id}`}
-              className="text-[12px] text-[#1f5bff] hover:underline"
-            >
-              + Create Invoice
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-text-secondary" />
+              Projects
+            </CardTitle>
+            <Link href={`/projects/new?customer=${id}`}>
+              <Button variant="outline" size="sm">
+                New Project
+              </Button>
             </Link>
-          )}
-        </div>
-        <div className="p-5">
-          {!invoices || invoices.length === 0 ? (
-            <p className="py-4 text-center text-[13px] text-[rgba(232,236,255,0.5)]">
-              No invoices yet
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr
-                    className="border-b text-left text-[11px] font-semibold uppercase tracking-wide"
-                    style={{
-                      borderColor: 'rgba(255, 255, 255, 0.08)',
-                      color: 'rgba(232, 236, 255, 0.5)',
-                    }}
-                  >
-                    <th className="pb-3">Number</th>
-                    <th className="pb-3">Date</th>
-                    <th className="pb-3 text-right">Amount</th>
-                    <th className="pb-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((invoice) => (
-                    <tr
-                      key={invoice.id}
-                      className="border-b text-[13px] last:border-0"
-                      style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}
+          </CardHeader>
+          <CardContent>
+            {projects && projects.length > 0 ? (
+              <ul className="space-y-2">
+                {projects.map((project) => (
+                  <li key={project.id}>
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="flex items-center justify-between rounded-md p-2 hover:bg-surface-hover"
                     >
-                      <td className="py-3">
-                        <Link
-                          href={`/documents/${invoice.id}`}
-                          className="font-medium text-white hover:text-[#1f5bff]"
-                        >
-                          {invoice.document_number || 'Draft'}
-                        </Link>
-                      </td>
-                      <td className="py-3 text-[rgba(232,236,255,0.6)]">
-                        {invoice.issue_date ? formatDate(invoice.issue_date) : '-'}
-                      </td>
-                      <td className="py-3 text-right font-medium text-white">
-                        {formatCurrency(Number(invoice.total))}
-                      </td>
-                      <td className="py-3">
-                        <span
-                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                          style={getStatusStyle(invoice.status)}
-                        >
-                          {invoice.status}
+                      <div>
+                        <span className="font-medium">{project.name}</span>
+                        <span className="ml-2 text-text-muted text-sm">{project.code}</span>
+                      </div>
+                      <Badge variant={project.is_active ? 'success' : 'secondary'} className="text-xs">
+                        {project.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-text-muted text-sm">No projects yet</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="h-5 w-5 text-text-secondary" />
+              Recent Documents
+            </CardTitle>
+            <Link href={`/documents/new?customer=${id}`}>
+              <Button variant="outline" size="sm">
+                New Invoice
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {documents && documents.length > 0 ? (
+              <ul className="space-y-2">
+                {documents.map((doc) => (
+                  <li key={doc.id}>
+                    <Link
+                      href={`/documents/${doc.id}`}
+                      className="flex items-center justify-between rounded-md p-2 hover:bg-surface-hover"
+                    >
+                      <div>
+                        <span className="font-medium">
+                          {doc.document_number || 'Draft'}
                         </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          {doc.document_type}
+                        </Badge>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">
+                          {new Intl.NumberFormat('de-AT', {
+                            style: 'currency',
+                            currency: 'EUR',
+                          }).format(doc.total)}
+                        </div>
+                        <Badge
+                          variant={
+                            doc.status === 'paid'
+                              ? 'success'
+                              : doc.status === 'issued'
+                              ? 'info'
+                              : 'secondary'
+                          }
+                          className="text-xs"
+                        >
+                          {doc.status}
+                        </Badge>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-text-muted text-sm">No documents yet</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {customer.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-text-secondary whitespace-pre-wrap">{customer.notes}</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

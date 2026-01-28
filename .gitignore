@@ -2,16 +2,16 @@
 node_modules/
 .pnpm-store/
 
-# Next.js
+# Build outputs
 .next/
 out/
+dist/
 build/
 
 # Environment files
 .env
 .env.local
 .env.*.local
-!.env.example
 
 # IDE
 .idea/
@@ -20,30 +20,20 @@ build/
 *.swo
 .DS_Store
 
+# Testing
+coverage/
+playwright-report/
+test-results/
+
 # Logs
-logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
-
-# Testing
-coverage/
-.nyc_output/
 
 # Supabase
 supabase/.branches/
 supabase/.temp/
 
-# Turbo
-.turbo/
-
-# Vercel
-.vercel/
-
-# TypeScript
-*.tsbuildinfo
-
 # Misc
-*.pem
-*.key
-.cache/
+*.tsbuildinfo
+.vercel

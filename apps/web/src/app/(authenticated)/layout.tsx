@@ -2,15 +2,15 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
-import { Company, Profile, UserRole } from '@/types'
+import { Breadcrumbs } from '@/components/ui'
+import { type UserRole } from '@/types'
 
-interface MembershipWithCompany {
-  role: UserRole
-  company: Company
-}
-
-export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient()
+export default async function AuthenticatedLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const supabase = await createClient()
 
   const {
     data: { user },
@@ -20,37 +20,36 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
     redirect('/login')
   }
 
-  // Get user profile and company membership
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  const profile = profileData as Profile | null
-
-  const { data: membershipsData } = await supabase
+  // Get user profile and company membership (use maybeSingle to handle RLS)
+  const { data: membership } = await supabase
     .from('company_members')
-    .select(
-      `
-      *,
-      company:companies(*)
-    `
-    )
+    .select('role')
     .eq('user_id', user.id)
     .eq('is_active', true)
+    .maybeSingle()
 
-  const memberships = (membershipsData || []) as MembershipWithCompany[]
-  const currentMembership = memberships[0]
-  const currentCompany = currentMembership?.company
-  const currentRole = currentMembership?.role
+  // Get profile separately
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  // Default to employee if no membership found (edge case during onboarding)
+  const userRole: UserRole = (membership?.role as UserRole) || 'employee'
+  const userName = profile?.full_name || user.email?.split('@')[0] || 'User'
+  const userEmail = profile?.email || user.email || ''
 
   return (
-    <div className="min-h-screen">
-      <Sidebar role={currentRole} />
-      <div className="lg:pl-[220px]">
-        <Header user={user} profile={profile} company={currentCompany} role={currentRole} />
-        <main className="p-4 lg:p-6">{children}</main>
+    <div className="min-h-screen bg-background">
+      <Sidebar userRole={userRole} userName={userName} userEmail={userEmail} />
+
+      <div className="ml-64">
+        <Header />
+        <main className="p-6">
+          <Breadcrumbs />
+          {children}
+        </main>
       </div>
     </div>
   )

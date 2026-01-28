@@ -1,438 +1,285 @@
 'use server'
 
+import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/email'
-import { getTeamInviteEmailHtml } from '@/lib/email/templates'
-import type { UserRole } from '@/types/database'
 
-interface CompanyMembership {
-  company_id: string
-  role: string
+interface ActionResult {
+  success: boolean
+  error?: string
+  data?: any
 }
 
-export async function updateCompanyInfo(formData: FormData) {
-  const supabase = createClient()
+export interface CompanySettings {
+  default_payment_terms_days: number
+  invoice_prefix: string
+  credit_note_prefix: string
+  default_tax_rate: string
+  mileage_rate: number
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
+export interface CompanyInfo {
+  id: string
+  name: string
+  legal_name: string
+  vat_number: string | null
+  registration_number: string | null
+  address_line1: string | null
+  address_line2: string | null
+  postal_code: string | null
+  city: string | null
+  country: string
+  email: string | null
+  phone: string | null
+  website: string | null
+  logo_url: string | null
+  settings: CompanySettings
+}
 
-  // Get user's company and verify admin role
-  const { data: membershipData } = await supabase
+/**
+ * Get the current company information
+ */
+export async function getCompanyInfo(): Promise<ActionResult & { data?: CompanyInfo }> {
+  const supabase = await createClient()
+
+  const { data: membership } = await supabase
     .from('company_members')
     .select('company_id, role')
-    .eq('user_id', user.id)
     .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership?.company_id) {
+    return { success: false, error: 'No company found' }
+  }
+
+  const { data: company, error } = await supabase
+    .from('companies')
+    .select('*')
+    .eq('id', membership.company_id)
     .single()
 
-  const membership = membershipData as CompanyMembership | null
+  if (error) {
+    return { success: false, error: error.message }
+  }
 
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can update company settings' }
+  return { success: true, data: company as CompanyInfo }
+}
+
+/**
+ * Update company information
+ */
+export async function updateCompanyInfo(data: Partial<Omit<CompanyInfo, 'id' | 'settings'>>): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const { data: membership } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership?.company_id) {
+    return { success: false, error: 'No company found' }
+  }
+
+  if (membership.role !== 'superadmin') {
+    return { success: false, error: 'Only superadmins can update company settings' }
   }
 
   const { error } = await supabase
     .from('companies')
     .update({
-      name: formData.get('name') as string,
-      legal_name: (formData.get('legal_name') as string) || null,
-      vat_number: (formData.get('vat_number') as string) || null,
-      registration_number: (formData.get('registration_number') as string) || null,
-    } as never)
+      ...data,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', membership.company_id)
 
   if (error) {
-    console.error('Error updating company info:', error)
-    return { error: error.message }
+    return { success: false, error: error.message }
   }
 
   revalidatePath('/settings')
   return { success: true }
 }
 
-export async function updateCompanyAddress(formData: FormData) {
-  const supabase = createClient()
+/**
+ * Update company settings (JSON settings field)
+ */
+export async function updateCompanySettings(settings: Partial<CompanySettings>): Promise<ActionResult> {
+  const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Get user's company and verify admin role
-  const { data: membershipData } = await supabase
+  const { data: membership } = await supabase
     .from('company_members')
     .select('company_id, role')
-    .eq('user_id', user.id)
     .eq('is_active', true)
-    .single()
+    .maybeSingle()
 
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can update company settings' }
+  if (!membership?.company_id) {
+    return { success: false, error: 'No company found' }
   }
 
-  const { error } = await supabase
-    .from('companies')
-    .update({
-      address_line1: (formData.get('address_line1') as string) || null,
-      address_line2: (formData.get('address_line2') as string) || null,
-      postal_code: (formData.get('postal_code') as string) || null,
-      city: (formData.get('city') as string) || null,
-      country: (formData.get('country') as string) || 'AT',
-    } as never)
-    .eq('id', membership.company_id)
-
-  if (error) {
-    console.error('Error updating company address:', error)
-    return { error: error.message }
+  if (membership.role !== 'superadmin') {
+    return { success: false, error: 'Only superadmins can update company settings' }
   }
 
-  revalidatePath('/settings')
-  return { success: true }
-}
-
-export async function updateCompanyContact(formData: FormData) {
-  const supabase = createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Get user's company and verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can update company settings' }
-  }
-
-  const { error } = await supabase
-    .from('companies')
-    .update({
-      email: (formData.get('email') as string) || null,
-      phone: (formData.get('phone') as string) || null,
-      website: (formData.get('website') as string) || null,
-    } as never)
-    .eq('id', membership.company_id)
-
-  if (error) {
-    console.error('Error updating company contact:', error)
-    return { error: error.message }
-  }
-
-  revalidatePath('/settings')
-  return { success: true }
-}
-
-// Team management functions
-export async function inviteTeamMember(formData: FormData) {
-  const supabase = createClient()
-  const serviceClient = createServiceClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can invite team members' }
-  }
-
-  const email = formData.get('email') as string
-  const role = formData.get('role') as UserRole
-  const firstName = formData.get('first_name') as string
-  const lastName = formData.get('last_name') as string
-  const hourlyRate = formData.get('hourly_rate')
-    ? parseFloat(formData.get('hourly_rate') as string)
-    : null
-
-  if (!email || !role) {
-    return { error: 'Email and role are required' }
-  }
-
-  // Get company details
+  // Get current settings
   const { data: company } = await supabase
     .from('companies')
-    .select('name')
+    .select('settings')
     .eq('id', membership.company_id)
     .single()
 
-  // Get inviter's profile
-  const { data: inviterProfile } = await supabase
+  const currentSettings = (company?.settings || {}) as CompanySettings
+  const newSettings = { ...currentSettings, ...settings }
+
+  const { error } = await supabase
+    .from('companies')
+    .update({
+      settings: newSettings,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', membership.company_id)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+/**
+ * Get current user's profile
+ */
+export async function getUserProfile(): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: profile, error } = await supabase
     .from('profiles')
-    .select('first_name, last_name')
+    .select('*')
     .eq('id', user.id)
     .single()
 
-  const inviterName = inviterProfile
-    ? `${inviterProfile.first_name || ''} ${inviterProfile.last_name || ''}`.trim() || email
-    : email
-
-  // Check if user already exists in auth
-  const { data: existingUsers } = await serviceClient.auth.admin.listUsers()
-  const existingUser = existingUsers?.users.find((u: { email?: string }) => u.email === email)
-
-  let userId: string
-
-  if (existingUser) {
-    userId = existingUser.id
-
-    // Check if already a member of this company
-    const { data: existingMember } = await supabase
-      .from('company_members')
-      .select('id, is_active')
-      .eq('company_id', membership.company_id)
-      .eq('user_id', userId)
-      .single()
-
-    if (existingMember) {
-      if (existingMember.is_active) {
-        return { error: 'User is already a member of this company' }
-      }
-      // Reactivate membership
-      const { error: updateError } = await supabase
-        .from('company_members')
-        .update({
-          is_active: true,
-          role: role,
-          hourly_rate: hourlyRate,
-          joined_at: new Date().toISOString(),
-        } as never)
-        .eq('id', existingMember.id)
-
-      if (updateError) {
-        return { error: updateError.message }
-      }
-
-      revalidatePath('/team')
-      return { success: true, message: 'Team member reactivated' }
-    }
-  } else {
-    // Create new user via Supabase Auth invite
-    const { data: inviteData, error: inviteError } =
-      await serviceClient.auth.admin.inviteUserByEmail(email, {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-        },
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-      })
-
-    if (inviteError) {
-      console.error('Error inviting user:', inviteError)
-      return { error: inviteError.message }
-    }
-
-    userId = inviteData.user.id
-
-    // Create profile for new user
-    const { error: profileError } = await serviceClient.from('profiles').insert({
-      id: userId,
-      email: email,
-      first_name: firstName || null,
-      last_name: lastName || null,
-    } as never)
-
-    if (profileError) {
-      console.error('Error creating profile:', profileError)
-      // Continue anyway, profile might be created by trigger
-    }
+  if (error) {
+    return { success: false, error: error.message }
   }
 
-  // Create company membership
-  const { error: memberError } = await supabase.from('company_members').insert({
-    company_id: membership.company_id,
-    user_id: userId,
-    role: role,
-    hourly_rate: hourlyRate,
-    invited_at: new Date().toISOString(),
-    is_active: true,
-  } as never)
+  // Get membership info
+  const { data: membership } = await supabase
+    .from('company_members')
+    .select('role, hourly_rate')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
 
-  if (memberError) {
-    console.error('Error creating membership:', memberError)
-    return { error: memberError.message }
+  return {
+    success: true,
+    data: {
+      ...profile,
+      role: membership?.role || 'employee',
+      hourly_rate: membership?.hourly_rate,
+    },
   }
-
-  // Send invitation email
-  const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/login`
-  const emailHtml = getTeamInviteEmailHtml({
-    inviterName,
-    companyName: company?.name || 'BOTFORCE',
-    role: role === 'superadmin' ? 'Admin' : role === 'accountant' ? 'Accountant' : 'Employee',
-    inviteLink,
-  })
-
-  await sendEmail({
-    to: email,
-    subject: `You're invited to join ${company?.name || 'BOTFORCE'} on BOTFORCE Unity`,
-    html: emailHtml,
-  })
-
-  revalidatePath('/team')
-  return { success: true, message: `Invitation sent to ${email}` }
 }
 
-export async function updateTeamMemberRole(memberId: string, newRole: UserRole) {
-  const supabase = createClient()
+/**
+ * Update current user's profile
+ */
+export async function updateUserProfile(data: {
+  full_name?: string
+  phone?: string
+  avatar_url?: string
+}): Promise<ActionResult> {
+  const supabase = await createClient()
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
   if (!user) {
-    return { error: 'Unauthorized' }
+    return { success: false, error: 'Not authenticated' }
   }
 
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can update team member roles' }
-  }
-
-  // Update the member's role
   const { error } = await supabase
-    .from('company_members')
-    .update({ role: newRole } as never)
-    .eq('id', memberId)
-    .eq('company_id', membership.company_id)
+    .from('profiles')
+    .update({
+      ...data,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id)
 
   if (error) {
-    console.error('Error updating member role:', error)
-    return { error: error.message }
+    return { success: false, error: error.message }
   }
 
-  revalidatePath('/team')
+  revalidatePath('/settings')
   return { success: true }
 }
 
-export async function removeTeamMember(memberId: string) {
-  const supabase = createClient()
+/**
+ * Get dashboard stats for overdue invoices
+ */
+export async function getDashboardStats(): Promise<ActionResult> {
+  const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Verify admin role
-  const { data: membershipData } = await supabase
+  const { data: membership } = await supabase
     .from('company_members')
-    .select('company_id, role, user_id')
-    .eq('user_id', user.id)
+    .select('role')
     .eq('is_active', true)
-    .single()
+    .maybeSingle()
 
-  const membership = membershipData as (CompanyMembership & { user_id: string }) | null
+  const role = membership?.role || 'employee'
 
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can remove team members' }
+  // Get overdue invoices (for admin/accountant)
+  let overdueInvoices: any[] = []
+  if (role === 'superadmin' || role === 'accountant') {
+    const today = new Date().toISOString().split('T')[0]
+    const { data } = await supabase
+      .from('documents')
+      .select('id, document_number, total, due_date, customer:customers(name)')
+      .eq('document_type', 'invoice')
+      .eq('status', 'issued')
+      .lt('due_date', today)
+      .order('due_date', { ascending: true })
+      .limit(5)
+
+    overdueInvoices = data || []
   }
 
-  // Get the member to be removed
-  const { data: targetMember } = await supabase
-    .from('company_members')
-    .select('user_id')
-    .eq('id', memberId)
-    .eq('company_id', membership.company_id)
-    .single()
+  // Get pending time entry approvals (for superadmin)
+  let pendingTimeApprovals = 0
+  if (role === 'superadmin') {
+    const { count } = await supabase
+      .from('time_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'submitted')
 
-  if (!targetMember) {
-    return { error: 'Team member not found' }
+    pendingTimeApprovals = count || 0
   }
 
-  // Prevent removing yourself
-  if (targetMember.user_id === user.id) {
-    return { error: 'You cannot remove yourself from the team' }
+  // Get pending expense approvals (for superadmin)
+  let pendingExpenseApprovals = 0
+  if (role === 'superadmin') {
+    const { count } = await supabase
+      .from('expenses')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'submitted')
+
+    pendingExpenseApprovals = count || 0
   }
 
-  // Soft delete - deactivate the membership
-  const { error } = await supabase
-    .from('company_members')
-    .update({ is_active: false } as never)
-    .eq('id', memberId)
-    .eq('company_id', membership.company_id)
-
-  if (error) {
-    console.error('Error removing team member:', error)
-    return { error: error.message }
+  return {
+    success: true,
+    data: {
+      overdueInvoices,
+      pendingTimeApprovals,
+      pendingExpenseApprovals,
+    },
   }
-
-  revalidatePath('/team')
-  return { success: true }
-}
-
-export async function updateTeamMemberHourlyRate(memberId: string, hourlyRate: number | null) {
-  const supabase = createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  // Verify admin role
-  const { data: membershipData } = await supabase
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const membership = membershipData as CompanyMembership | null
-
-  if (!membership || membership.role !== 'superadmin') {
-    return { error: 'Only admins can update hourly rates' }
-  }
-
-  const { error } = await supabase
-    .from('company_members')
-    .update({ hourly_rate: hourlyRate } as never)
-    .eq('id', memberId)
-    .eq('company_id', membership.company_id)
-
-  if (error) {
-    console.error('Error updating hourly rate:', error)
-    return { error: error.message }
-  }
-
-  revalidatePath('/team')
-  return { success: true }
 }

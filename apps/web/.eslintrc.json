@@ -1,39 +1,7 @@
 {
-  "extends": [
-    "next/core-web-vitals"
-  ],
+  "extends": "next/core-web-vitals",
   "rules": {
-    "no-unused-vars": [
-      "warn",
-      {
-        "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_"
-      }
-    ],
-    "no-console": [
-      "warn",
-      {
-        "allow": ["warn", "error", "info", "debug"]
-      }
-    ],
-    "prefer-const": "warn",
-    "no-var": "error",
-    "eqeqeq": ["warn", "always"],
-    "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn"
-  },
-  "overrides": [
-    {
-      "files": ["*.test.ts", "*.test.tsx", "*.spec.ts", "*.spec.tsx", "e2e/**/*"],
-      "rules": {
-        "no-console": "off"
-      }
-    }
-  ],
-  "ignorePatterns": [
-    "node_modules/",
-    ".next/",
-    "coverage/",
-    "playwright-report/"
-  ]
+    "react/no-unescaped-entities": "off",
+    "@next/next/no-img-element": "warn"
+  }
 }

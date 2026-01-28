@@ -1,221 +1,348 @@
-// Invoice email template
-export function getInvoiceEmailHtml(params: {
-  customerName: string
-  documentNumber: string
-  total: number
-  currency: string
-  dueDate: string
-  companyName: string
-}) {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invoice ${params.documentNumber}</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">${params.companyName}</h1>
-  </div>
+import type { Document, Customer } from '@/types'
 
-  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #e9ecef; border-top: none;">
-    <h2 style="color: #333; margin-top: 0;">Invoice ${params.documentNumber}</h2>
-
-    <p>Dear ${params.customerName},</p>
-
-    <p>Please find attached your invoice with the following details:</p>
-
-    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;"><strong>Invoice Number:</strong></td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">${params.documentNumber}</td>
-      </tr>
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;"><strong>Total Amount:</strong></td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6; font-size: 18px; color: #667eea;"><strong>${params.currency} ${params.total.toFixed(2)}</strong></td>
-      </tr>
-      <tr>
-        <td style="padding: 10px;"><strong>Due Date:</strong></td>
-        <td style="padding: 10px;">${params.dueDate}</td>
-      </tr>
-    </table>
-
-    <p>Please ensure payment is made by the due date. If you have any questions regarding this invoice, please don't hesitate to contact us.</p>
-
-    <p style="margin-bottom: 0;">Best regards,<br><strong>${params.companyName}</strong></p>
-  </div>
-
-  <div style="background: #333; padding: 20px; border-radius: 0 0 10px 10px; text-align: center;">
-    <p style="color: #999; margin: 0; font-size: 12px;">This email was sent by BOTFORCE Unity</p>
-  </div>
-</body>
-</html>
-`
+interface CompanyInfo {
+  name: string
+  email?: string
+  phone?: string
+  website?: string
+  address?: string
 }
 
-// Team invite email template
-export function getTeamInviteEmailHtml(params: {
-  inviterName: string
-  companyName: string
-  role: string
-  inviteLink: string
-}) {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Team Invitation</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">BOTFORCE Unity</h1>
-  </div>
-
-  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #e9ecef; border-top: none;">
-    <h2 style="color: #333; margin-top: 0;">You're Invited!</h2>
-
-    <p><strong>${params.inviterName}</strong> has invited you to join <strong>${params.companyName}</strong> as a <strong>${params.role}</strong>.</p>
-
-    <p>Click the button below to accept the invitation and set up your account:</p>
-
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${params.inviteLink}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Accept Invitation</a>
-    </div>
-
-    <p style="color: #666; font-size: 14px;">This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.</p>
-
-    <p style="margin-bottom: 0;">Best regards,<br><strong>The BOTFORCE Unity Team</strong></p>
-  </div>
-
-  <div style="background: #333; padding: 20px; border-radius: 0 0 10px 10px; text-align: center;">
-    <p style="color: #999; margin: 0; font-size: 12px;">This email was sent by BOTFORCE Unity</p>
-  </div>
-</body>
-</html>
-`
+function formatCurrency(amount: number, currency: string = 'EUR'): string {
+  return new Intl.NumberFormat('de-AT', {
+    style: 'currency',
+    currency,
+  }).format(amount)
 }
 
-// Approval notification email template
-export function getApprovalNotificationEmailHtml(params: {
-  recipientName: string
-  type: 'timesheet' | 'expense'
-  status: 'submitted' | 'approved' | 'rejected'
-  details: string
-  reason?: string
-  companyName: string
-}) {
-  const statusColors = {
-    submitted: '#ffc107',
-    approved: '#28a745',
-    rejected: '#dc3545',
-  }
-
-  const statusLabels = {
-    submitted: 'Submitted for Approval',
-    approved: 'Approved',
-    rejected: 'Rejected',
-  }
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${params.type === 'timesheet' ? 'Timesheet' : 'Expense'} ${statusLabels[params.status]}</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">${params.companyName}</h1>
-  </div>
-
-  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #e9ecef; border-top: none;">
-    <div style="background: ${statusColors[params.status]}; color: white; padding: 10px 20px; border-radius: 5px; display: inline-block; margin-bottom: 20px;">
-      ${statusLabels[params.status]}
-    </div>
-
-    <h2 style="color: #333; margin-top: 0;">${params.type === 'timesheet' ? 'Timesheet' : 'Expense'} Update</h2>
-
-    <p>Dear ${params.recipientName},</p>
-
-    <p>Your ${params.type} has been <strong>${params.status}</strong>.</p>
-
-    <div style="background: white; padding: 15px; border-radius: 5px; border-left: 4px solid ${statusColors[params.status]}; margin: 20px 0;">
-      <p style="margin: 0;"><strong>Details:</strong> ${params.details}</p>
-      ${params.reason ? `<p style="margin: 10px 0 0 0;"><strong>Reason:</strong> ${params.reason}</p>` : ''}
-    </div>
-
-    <p style="margin-bottom: 0;">Best regards,<br><strong>${params.companyName}</strong></p>
-  </div>
-
-  <div style="background: #333; padding: 20px; border-radius: 0 0 10px 10px; text-align: center;">
-    <p style="color: #999; margin: 0; font-size: 12px;">This email was sent by BOTFORCE Unity</p>
-  </div>
-</body>
-</html>
-`
+function formatDate(date: string): string {
+  return new Intl.DateTimeFormat('de-AT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(date))
 }
 
-// Payment reminder email template
-export function getPaymentReminderEmailHtml(params: {
-  customerName: string
-  documentNumber: string
-  total: number
-  currency: string
-  dueDate: string
-  daysOverdue: number
-  companyName: string
-}) {
-  return `
+export function invoiceEmailTemplate(
+  document: Document,
+  customer: Customer,
+  company: CompanyInfo,
+  pdfUrl?: string
+): { subject: string; html: string; text: string } {
+  const isInvoice = document.document_type === 'invoice'
+  const docType = isInvoice ? 'Invoice' : 'Credit Note'
+
+  const subject = `${docType} ${document.document_number} from ${company.name}`
+
+  const html = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Reminder - ${params.documentNumber}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 2px solid #2563eb;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .company-name {
+      font-size: 24px;
+      font-weight: 600;
+      color: #2563eb;
+    }
+    .greeting {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .document-info {
+      background: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .document-info h2 {
+      margin: 0 0 15px 0;
+      font-size: 16px;
+      color: #666;
+    }
+    .amount {
+      font-size: 28px;
+      font-weight: 700;
+      color: ${isInvoice ? '#2563eb' : '#dc2626'};
+    }
+    .details {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #666;
+    }
+    .details p {
+      margin: 5px 0;
+    }
+    .cta-button {
+      display: inline-block;
+      background: #2563eb;
+      color: white !important;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-weight: 500;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      color: #666;
+    }
+    .payment-info {
+      background: #fef3c7;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .payment-info h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #92400e;
+    }
+  </style>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">${params.companyName}</h1>
+<body>
+  <div class="header">
+    <div class="company-name">${company.name}</div>
   </div>
 
-  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #e9ecef; border-top: none;">
-    <h2 style="color: #dc3545; margin-top: 0;">Payment Reminder</h2>
-
-    <p>Dear ${params.customerName},</p>
-
-    <p>This is a friendly reminder that invoice <strong>${params.documentNumber}</strong> is now <strong>${params.daysOverdue} days overdue</strong>.</p>
-
-    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;"><strong>Invoice Number:</strong></td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">${params.documentNumber}</td>
-      </tr>
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;"><strong>Amount Due:</strong></td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6; font-size: 18px; color: #dc3545;"><strong>${params.currency} ${params.total.toFixed(2)}</strong></td>
-      </tr>
-      <tr>
-        <td style="padding: 10px;"><strong>Original Due Date:</strong></td>
-        <td style="padding: 10px;">${params.dueDate}</td>
-      </tr>
-    </table>
-
-    <p>Please arrange payment at your earliest convenience. If you have already made the payment, please disregard this reminder.</p>
-
-    <p>If you have any questions or concerns, please don't hesitate to contact us.</p>
-
-    <p style="margin-bottom: 0;">Best regards,<br><strong>${params.companyName}</strong></p>
+  <div class="greeting">
+    Dear ${customer.name},
   </div>
 
-  <div style="background: #333; padding: 20px; border-radius: 0 0 10px 10px; text-align: center;">
-    <p style="color: #999; margin: 0; font-size: 12px;">This email was sent by BOTFORCE Unity</p>
+  <p>
+    Please find attached ${isInvoice ? 'your invoice' : 'your credit note'} from ${company.name}.
+  </p>
+
+  <div class="document-info">
+    <h2>${docType} Details</h2>
+    <div class="amount">${formatCurrency(document.total, document.currency)}</div>
+    <div class="details">
+      <p><strong>${docType} Number:</strong> ${document.document_number}</p>
+      <p><strong>Issue Date:</strong> ${formatDate(document.issue_date!)}</p>
+      ${document.due_date ? `<p><strong>Due Date:</strong> ${formatDate(document.due_date)}</p>` : ''}
+    </div>
+  </div>
+
+  ${isInvoice && document.due_date ? `
+  <div class="payment-info">
+    <h3>Payment Information</h3>
+    <p>Please ensure payment is made by <strong>${formatDate(document.due_date)}</strong>.</p>
+    <p>Payment terms: ${document.payment_terms_days} days</p>
+  </div>
+  ` : ''}
+
+  ${pdfUrl ? `
+  <a href="${pdfUrl}" class="cta-button">View ${docType}</a>
+  ` : ''}
+
+  <p>
+    If you have any questions about this ${docType.toLowerCase()}, please don't hesitate to contact us.
+  </p>
+
+  <p>
+    Thank you for your business!
+  </p>
+
+  <div class="footer">
+    <p><strong>${company.name}</strong></p>
+    ${company.email ? `<p>Email: ${company.email}</p>` : ''}
+    ${company.phone ? `<p>Phone: ${company.phone}</p>` : ''}
+    ${company.website ? `<p>Website: ${company.website}</p>` : ''}
+    ${company.address ? `<p>${company.address}</p>` : ''}
   </div>
 </body>
 </html>
-`
+  `.trim()
+
+  const text = `
+${docType} ${document.document_number} from ${company.name}
+
+Dear ${customer.name},
+
+Please find attached ${isInvoice ? 'your invoice' : 'your credit note'} from ${company.name}.
+
+${docType} Details:
+- ${docType} Number: ${document.document_number}
+- Amount: ${formatCurrency(document.total, document.currency)}
+- Issue Date: ${formatDate(document.issue_date!)}
+${document.due_date ? `- Due Date: ${formatDate(document.due_date)}` : ''}
+
+${isInvoice && document.due_date ? `
+Payment Information:
+Please ensure payment is made by ${formatDate(document.due_date)}.
+Payment terms: ${document.payment_terms_days} days
+` : ''}
+
+If you have any questions about this ${docType.toLowerCase()}, please don't hesitate to contact us.
+
+Thank you for your business!
+
+${company.name}
+${company.email || ''}
+${company.phone || ''}
+  `.trim()
+
+  return { subject, html, text }
+}
+
+export function paymentReminderTemplate(
+  document: Document,
+  customer: Customer,
+  company: CompanyInfo,
+  daysOverdue: number,
+  pdfUrl?: string
+): { subject: string; html: string; text: string } {
+  const isOverdue = daysOverdue > 0
+  const subject = isOverdue
+    ? `Payment Reminder: Invoice ${document.document_number} is ${daysOverdue} days overdue`
+    : `Payment Reminder: Invoice ${document.document_number} due soon`
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 2px solid ${isOverdue ? '#dc2626' : '#f59e0b'};
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .company-name {
+      font-size: 24px;
+      font-weight: 600;
+      color: #2563eb;
+    }
+    .alert-banner {
+      background: ${isOverdue ? '#fef2f2' : '#fffbeb'};
+      border: 1px solid ${isOverdue ? '#fecaca' : '#fde68a'};
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      color: ${isOverdue ? '#991b1b' : '#92400e'};
+    }
+    .document-info {
+      background: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .amount {
+      font-size: 28px;
+      font-weight: 700;
+      color: ${isOverdue ? '#dc2626' : '#f59e0b'};
+    }
+    .cta-button {
+      display: inline-block;
+      background: #2563eb;
+      color: white !important;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-weight: 500;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="company-name">${company.name}</div>
+  </div>
+
+  <p>Dear ${customer.name},</p>
+
+  <div class="alert-banner">
+    ${isOverdue
+      ? `<strong>Payment Overdue:</strong> Invoice ${document.document_number} is ${daysOverdue} days past the due date.`
+      : `<strong>Payment Reminder:</strong> Invoice ${document.document_number} is due on ${formatDate(document.due_date!)}.`
+    }
+  </div>
+
+  <div class="document-info">
+    <h2 style="margin: 0 0 15px 0; font-size: 16px; color: #666;">Invoice Details</h2>
+    <div class="amount">${formatCurrency(document.total, document.currency)}</div>
+    <div style="margin-top: 15px; font-size: 14px; color: #666;">
+      <p style="margin: 5px 0;"><strong>Invoice Number:</strong> ${document.document_number}</p>
+      <p style="margin: 5px 0;"><strong>Issue Date:</strong> ${formatDate(document.issue_date!)}</p>
+      <p style="margin: 5px 0;"><strong>Due Date:</strong> ${formatDate(document.due_date!)}</p>
+    </div>
+  </div>
+
+  ${pdfUrl ? `<a href="${pdfUrl}" class="cta-button">View Invoice</a>` : ''}
+
+  <p>
+    If you have already made this payment, please disregard this reminder.
+    If you have any questions or need to discuss payment arrangements, please contact us.
+  </p>
+
+  <p>Thank you for your prompt attention to this matter.</p>
+
+  <div class="footer">
+    <p><strong>${company.name}</strong></p>
+    ${company.email ? `<p>Email: ${company.email}</p>` : ''}
+    ${company.phone ? `<p>Phone: ${company.phone}</p>` : ''}
+  </div>
+</body>
+</html>
+  `.trim()
+
+  const text = `
+Payment Reminder: Invoice ${document.document_number}
+
+Dear ${customer.name},
+
+${isOverdue
+  ? `This is a reminder that Invoice ${document.document_number} is ${daysOverdue} days past the due date.`
+  : `This is a friendly reminder that Invoice ${document.document_number} is due on ${formatDate(document.due_date!)}.`
+}
+
+Invoice Details:
+- Invoice Number: ${document.document_number}
+- Amount: ${formatCurrency(document.total, document.currency)}
+- Issue Date: ${formatDate(document.issue_date!)}
+- Due Date: ${formatDate(document.due_date!)}
+
+If you have already made this payment, please disregard this reminder.
+If you have any questions, please contact us.
+
+Thank you for your prompt attention to this matter.
+
+${company.name}
+${company.email || ''}
+  `.trim()
+
+  return { subject, html, text }
 }

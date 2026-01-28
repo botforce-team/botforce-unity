@@ -1,48 +1,25 @@
 {
   "name": "botforce-unity",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "BOTFORCE Unity - Invoicing, Time Tracking & Accounting Prep",
   "scripts": {
-    "dev": "pnpm --filter web dev",
-    "build": "pnpm --filter web build",
-    "start": "pnpm --filter web start",
-    "lint": "pnpm --filter web lint",
-    "test": "pnpm --filter web test",
-    "test:coverage": "pnpm --filter web test:coverage",
-    "typecheck": "pnpm --filter web exec tsc --noEmit",
-    "db:reset": "supabase db reset",
-    "db:push": "supabase db push",
-    "db:diff": "supabase db diff",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop",
-    "prepare": "husky"
-  },
-  "keywords": [
-    "invoicing",
-    "time-tracking",
-    "accounting",
-    "supabase",
-    "nextjs"
-  ],
-  "author": "BOTFORCE GmbH",
-  "license": "UNLICENSED",
-  "packageManager": "pnpm@8.15.0",
-  "engines": {
-    "node": ">=18.0.0"
+    "dev": "pnpm --filter @botforce/web dev",
+    "build": "pnpm --filter @botforce/web build",
+    "start": "pnpm --filter @botforce/web start",
+    "lint": "pnpm --filter @botforce/web lint",
+    "typecheck": "pnpm --filter @botforce/web typecheck",
+    "test": "pnpm --filter @botforce/web test",
+    "test:e2e": "pnpm --filter @botforce/web test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "husky": "^9.0.0",
-    "lint-staged": "^15.2.0",
-    "prettier": "^3.2.0",
+    "prettier": "^3.2.5",
     "prettier-plugin-tailwindcss": "^0.5.11"
   },
-  "lint-staged": {
-    "apps/web/src/**/*.{ts,tsx}": [
-      "eslint --fix"
-    ],
-    "apps/web/src/**/*.{ts,tsx,json,css}": [
-      "prettier --write"
-    ]
-  }
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
 }

@@ -1,339 +1,258 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
-import { TimesheetFilters } from './filters'
-import { DayEntries } from './day-entries'
+import { Plus, Clock, Calendar } from 'lucide-react'
+import { Button, Card, Badge, EmptyState } from '@/components/ui'
+import { getMyTimeEntries } from '@/app/actions/time-entries'
+import { createClient } from '@/lib/supabase/server'
+import { TimeEntryActions } from './time-entry-actions'
+import { BulkActions } from './bulk-actions'
 
-// Force dynamic rendering to always show fresh data
-export const dynamic = 'force-dynamic'
-
-interface SearchParams {
-  project?: string
-  month?: string
-  year?: string
+interface TimesheetsPageProps {
+  searchParams: Promise<{
+    page?: string
+    project?: string
+    status?: string
+    from?: string
+    to?: string
+  }>
 }
 
-interface CompanyMembership {
-  company_id: string
-  role: string
+const statusColors: Record<string, 'secondary' | 'info' | 'success' | 'danger' | 'warning'> = {
+  draft: 'secondary',
+  submitted: 'info',
+  approved: 'success',
+  rejected: 'danger',
+  invoiced: 'warning',
 }
 
-interface TimeEntryWithRelations {
-  id: string
-  date: string
-  hours: number
-  description: string | null
-  status: string
-  rejection_reason: string | null
-  user_id: string
-  project_id: string
-  project: { id: string; name: string; code: string | null } | null
-  profile: { id: string; email: string; first_name: string | null; last_name: string | null } | null
-}
+export default async function TimesheetsPage({ searchParams }: TimesheetsPageProps) {
+  const params = await searchParams
+  const page = Number(params.page) || 1
+  const projectId = params.project
+  const status = params.status as any
+  const dateFrom = params.from
+  const dateTo = params.to
 
-interface ProjectOption {
-  id: string
-  name: string
-  code: string | null
-}
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-export default async function TimesheetsPage({ searchParams }: { searchParams: SearchParams }) {
-  const supabase = createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  // Get user's company membership
-  const { data: membershipData } = await supabase
+  // Check if user is admin for approval permissions
+  const { data: membership } = await supabase
     .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', user.id)
+    .select('role')
+    .eq('user_id', user?.id)
     .eq('is_active', true)
-    .single()
+    .maybeSingle()
 
-  const membership = membershipData as CompanyMembership | null
+  const isAdmin = membership?.role === 'superadmin'
 
-  if (!membership) {
-    return (
-      <div className="py-12 text-center">
-        <p className="text-[rgba(232,236,255,0.6)]">No company access.</p>
-      </div>
-    )
-  }
-
-  const { company_id, role } = membership
-  const isAdmin = role === 'superadmin'
-
-  // Fetch projects for filter
-  const { data: projectsData } = await supabase
-    .from('projects')
-    .select('id, name, code')
-    .eq('company_id', company_id)
-    .eq('is_active', true)
-    .order('name')
-
-  const projects = (projectsData || []) as ProjectOption[]
-
-  // Fetch time entries based on role
-  let timeEntriesQuery = supabase
-    .from('time_entries')
-    .select(
-      `
-      *,
-      project:projects(id, name, code),
-      profile:profiles!time_entries_user_id_fkey(id, email, first_name, last_name)
-    `
-    )
-    .eq('company_id', company_id)
-    .order('date', { ascending: false })
-    .limit(200)
-
-  if (!isAdmin) {
-    timeEntriesQuery = timeEntriesQuery.eq('user_id', user.id)
-  }
-
-  // Apply project filter
-  if (searchParams.project) {
-    timeEntriesQuery = timeEntriesQuery.eq('project_id', searchParams.project)
-  }
-
-  // Apply date filters
-  const filterYear =
-    searchParams.year || (searchParams.month ? new Date().getFullYear().toString() : null)
-
-  if (searchParams.month && filterYear) {
-    // Filter by specific month and year
-    const startDate = `${filterYear}-${searchParams.month}-01`
-    const endDate = new Date(parseInt(filterYear), parseInt(searchParams.month), 0)
-    const endDateStr = `${filterYear}-${searchParams.month}-${endDate.getDate().toString().padStart(2, '0')}`
-    timeEntriesQuery = timeEntriesQuery.gte('date', startDate).lte('date', endDateStr)
-  } else if (filterYear) {
-    // Filter by year only
-    const startDate = `${filterYear}-01-01`
-    const endDate = `${filterYear}-12-31`
-    timeEntriesQuery = timeEntriesQuery.gte('date', startDate).lte('date', endDate)
-  }
-
-  const { data: timeEntriesData } = await timeEntriesQuery
-  const timeEntries = (timeEntriesData || []) as TimeEntryWithRelations[]
-
-  // Group by project, then by month, then by day
-  const groupedByProject = timeEntries.reduce(
-    (acc, entry) => {
-      const projectId = entry.project_id
-      const projectName = entry.project?.name || 'Unknown Project'
-      const projectCode = entry.project?.code || ''
-      const projectKey = `${projectId}|${projectName}|${projectCode}`
-
-      if (!acc[projectKey]) {
-        acc[projectKey] = {
-          projectId,
-          projectName,
-          projectCode,
-          months: {} as Record<string, Record<string, typeof timeEntries>>,
-        }
-      }
-
-      // Group by month (YYYY-MM format)
-      const month = entry.date.substring(0, 7)
-      if (!acc[projectKey].months[month]) {
-        acc[projectKey].months[month] = {}
-      }
-
-      // Group by day within month
-      const day = entry.date
-      if (!acc[projectKey].months[month][day]) {
-        acc[projectKey].months[month][day] = []
-      }
-      acc[projectKey].months[month][day].push(entry)
-
-      return acc
-    },
-    {} as Record<
-      string,
-      {
-        projectId: string
-        projectName: string
-        projectCode: string
-        months: Record<string, Record<string, typeof timeEntries>>
-      }
-    >
-  )
-
-  const projectKeys = Object.keys(groupedByProject).sort((a, b) => {
-    const nameA = a.split('|')[1]
-    const nameB = b.split('|')[1]
-    return nameA.localeCompare(nameB)
+  const { data: entries, total, totalPages } = await getMyTimeEntries({
+    page,
+    projectId,
+    status,
+    dateFrom,
+    dateTo,
+    limit: 50,
   })
 
-  const statusStyles: Record<string, { bg: string; border: string; color: string }> = {
-    draft: {
-      bg: 'rgba(255, 255, 255, 0.08)',
-      border: 'rgba(255, 255, 255, 0.12)',
-      color: 'rgba(255, 255, 255, 0.6)',
-    },
-    submitted: {
-      bg: 'rgba(245, 158, 11, 0.12)',
-      border: 'rgba(245, 158, 11, 0.35)',
-      color: '#f59e0b',
-    },
-    approved: {
-      bg: 'rgba(34, 197, 94, 0.12)',
-      border: 'rgba(34, 197, 94, 0.35)',
-      color: '#22c55e',
-    },
-    rejected: {
-      bg: 'rgba(239, 68, 68, 0.12)',
-      border: 'rgba(239, 68, 68, 0.35)',
-      color: '#ef4444',
-    },
-    invoiced: {
-      bg: 'rgba(139, 92, 246, 0.12)',
-      border: 'rgba(139, 92, 246, 0.35)',
-      color: '#a78bfa',
-    },
+  // Group entries by date
+  const entriesByDate = entries.reduce((acc, entry) => {
+    const date = entry.date
+    if (!acc[date]) {
+      acc[date] = []
+    }
+    acc[date].push(entry)
+    return acc
+  }, {} as Record<string, typeof entries>)
+
+  const dates = Object.keys(entriesByDate).sort((a, b) => b.localeCompare(a))
+
+  const formatDate = (date: string) => {
+    const d = new Date(date)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    if (d.toDateString() === today.toDateString()) {
+      return 'Today'
+    }
+    if (d.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday'
+    }
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    }).format(d)
   }
 
-  const formatMonth = (monthStr: string) => {
-    const [year, month] = monthStr.split('-')
-    const date = new Date(parseInt(year), parseInt(month) - 1)
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const formatTime = (time: string | null) => {
+    if (!time) return ''
+    return time.slice(0, 5)
   }
+
+  // Calculate weekly summary
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay() + 1)
+  const weeklyHours = entries
+    .filter((e) => new Date(e.date) >= startOfWeek)
+    .reduce((sum, e) => sum + (e.hours || 0), 0)
+
+  // Get IDs for bulk actions
+  const draftIds = entries.filter((e) => e.status === 'draft').map((e) => e.id)
+  const submittedIds = entries.filter((e) => e.status === 'submitted').map((e) => e.id)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Timesheets</h1>
-          <p className="mt-1 text-[13px] text-[rgba(232,236,255,0.68)]">
-            {isAdmin ? 'Review all time entries' : 'Log and manage your time'}
+          <h1 className="text-2xl font-semibold">Timesheets</h1>
+          <p className="text-text-secondary mt-1">
+            {weeklyHours.toFixed(1)} hours logged this week
           </p>
         </div>
-        <Link
-          href="/timesheets/new"
-          className="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-semibold text-white"
-          style={{ background: '#1f5bff' }}
-        >
-          <Plus className="h-4 w-4" />
-          Log Time
+        <Link href="/timesheets/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Log Time
+          </Button>
         </Link>
       </div>
 
-      {/* Filters */}
-      <TimesheetFilters
-        projects={projects || []}
-        selectedProject={searchParams.project}
-        selectedMonth={searchParams.month}
-        selectedYear={searchParams.year}
-      />
-
-      {projectKeys.length === 0 ? (
-        <div
-          className="rounded-[18px] py-12 text-center"
-          style={{
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-          }}
-        >
-          <p className="text-[rgba(232,236,255,0.6)]">
-            No time entries yet.
-            {!isAdmin && ' Click "Log Time" to add your first entry.'}
-          </p>
+      {/* Filters and Bulk Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link
+            href="/timesheets"
+            className={`px-3 py-1 rounded-md transition-colors ${!status ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
+          >
+            All
+          </Link>
+          <Link
+            href="/timesheets?status=draft"
+            className={`px-3 py-1 rounded-md transition-colors ${status === 'draft' ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
+          >
+            Draft
+          </Link>
+          <Link
+            href="/timesheets?status=submitted"
+            className={`px-3 py-1 rounded-md transition-colors ${status === 'submitted' ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
+          >
+            Submitted
+          </Link>
+          <Link
+            href="/timesheets?status=approved"
+            className={`px-3 py-1 rounded-md transition-colors ${status === 'approved' ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
+          >
+            Approved
+          </Link>
         </div>
+        <BulkActions draftIds={draftIds} submittedIds={submittedIds} isAdmin={isAdmin} />
+      </div>
+
+      {entries.length === 0 ? (
+        <EmptyState
+          icon={Clock}
+          title="No time entries found"
+          description="Start tracking your work by logging your first time entry"
+          action={
+            <Link href="/timesheets/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Log Time
+              </Button>
+            </Link>
+          }
+        />
       ) : (
-        <div className="space-y-8">
-          {projectKeys.map((projectKey) => {
-            const {
-              projectId: _projectId,
-              projectName,
-              projectCode,
-              months,
-            } = groupedByProject[projectKey]
-            const monthKeys = Object.keys(months).sort((a, b) => b.localeCompare(a))
-            // Calculate total hours across all months and days
-            const totalProjectHours = Object.values(months).reduce((monthSum, days) => {
-              return (
-                monthSum +
-                Object.values(days)
-                  .flat()
-                  .reduce((daySum, e) => daySum + Number(e?.hours || 0), 0)
-              )
-            }, 0)
+        <div className="space-y-6">
+          {dates.map((date) => {
+            const dayEntries = entriesByDate[date]
+            const dayTotal = dayEntries.reduce((sum, e) => sum + (e.hours || 0), 0)
 
             return (
-              <div key={projectKey} className="space-y-4">
-                {/* Project Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-[18px] font-bold text-white">{projectName}</h2>
-                    {projectCode && (
-                      <span
-                        className="rounded px-2 py-0.5 text-[11px] font-medium text-[rgba(232,236,255,0.5)]"
-                        style={{ background: 'rgba(255,255,255,0.08)' }}
-                      >
-                        {projectCode}
-                      </span>
-                    )}
+              <Card key={date}>
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-text-muted" />
+                    <span className="font-medium">{formatDate(date)}</span>
                   </div>
-                  <span className="text-[15px] font-semibold text-[#1f5bff]">
-                    {totalProjectHours.toFixed(1)} hours total
+                  <span className="text-sm text-text-secondary">
+                    {dayTotal.toFixed(1)} hours
                   </span>
                 </div>
-
-                {/* Months */}
-                {monthKeys.map((month) => {
-                  const days = months[month]
-                  const dayKeys = Object.keys(days).sort((a, b) => b.localeCompare(a))
-                  const monthHours = Object.values(days)
-                    .flat()
-                    .reduce((sum, e) => sum + Number(e?.hours || 0), 0)
-
-                  return (
+                <div className="divide-y divide-border">
+                  {dayEntries.map((entry: any) => (
                     <div
-                      key={month}
-                      className="overflow-hidden rounded-[18px]"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.04)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                      }}
+                      key={entry.id}
+                      className="flex items-center justify-between px-4 py-3 hover:bg-surface-hover transition-colors"
                     >
-                      {/* Month Header */}
-                      <div
-                        className="flex items-center justify-between px-5 py-3"
-                        style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
-                      >
-                        <h3 className="text-[15px] font-semibold text-white">
-                          {formatMonth(month)}
-                        </h3>
-                        <span className="text-[13px] font-medium text-[rgba(232,236,255,0.6)]">
-                          {monthHours.toFixed(1)} hours
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/projects/${entry.project_id}`}
+                            className="font-medium hover:text-primary"
+                          >
+                            {entry.project?.name}
+                          </Link>
+                          <span className="text-text-muted text-sm">
+                            {entry.project?.code}
+                          </span>
+                        </div>
+                        {entry.description && (
+                          <p className="text-sm text-text-secondary truncate mt-0.5">
+                            {entry.description}
+                          </p>
+                        )}
+                        {entry.start_time && entry.end_time && (
+                          <p className="text-xs text-text-muted mt-0.5">
+                            {formatTime(entry.start_time)} - {formatTime(entry.end_time)}
+                            {entry.break_minutes ? ` (${entry.break_minutes}min break)` : ''}
+                          </p>
+                        )}
                       </div>
-
-                      {/* Days */}
-                      <div
-                        className="divide-y"
-                        style={{ borderColor: 'rgba(255, 255, 255, 0.06)' }}
-                      >
-                        {dayKeys.map((day) => (
-                          <DayEntries
-                            key={day}
-                            date={day}
-                            entries={days[day] || []}
-                            isAdmin={isAdmin}
-                            currentUserId={user.id}
-                            statusStyles={statusStyles}
-                          />
-                        ))}
+                      <div className="flex items-center gap-4 ml-4">
+                        <div className="text-right">
+                          <div className="font-medium">{entry.hours}h</div>
+                          {!entry.is_billable && (
+                            <span className="text-xs text-text-muted">Non-billable</span>
+                          )}
+                        </div>
+                        <Badge variant={statusColors[entry.status]}>
+                          {entry.status}
+                        </Badge>
+                        <TimeEntryActions entry={entry} isAdmin={isAdmin} />
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              </Card>
             )
           })}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-text-secondary">
+                Showing {(page - 1) * 50 + 1} to {Math.min(page * 50, total)} of {total} entries
+              </p>
+              <div className="flex items-center gap-2">
+                {page > 1 && (
+                  <Link href={`/timesheets?page=${page - 1}${status ? `&status=${status}` : ''}`}>
+                    <Button variant="outline" size="sm">
+                      Previous
+                    </Button>
+                  </Link>
+                )}
+                {page < totalPages && (
+                  <Link href={`/timesheets?page=${page + 1}${status ? `&status=${status}` : ''}`}>
+                    <Button variant="outline" size="sm">
+                      Next
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

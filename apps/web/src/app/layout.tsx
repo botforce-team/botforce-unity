@@ -1,13 +1,9 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
-import { Toaster } from '@/components/ui/toaster'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'BOTFORCE Unity',
-  description: 'Invoicing, Time Tracking & Accounting Prep',
+  description: 'Invoicing, time tracking, expense management for Austrian/EU service companies',
 }
 
 export default function RootLayout({
@@ -16,10 +12,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="de-AT">
+      <body className="min-h-screen bg-background antialiased">
         {children}
-        <Toaster />
       </body>
     </html>
   )

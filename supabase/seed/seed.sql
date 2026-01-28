@@ -1,80 +1,246 @@
--- Seed data for BOTFORCE Unity
--- Run after migrations to set up initial test data
-
 -- ============================================================================
--- Create test company
+-- SEED DATA FOR DEVELOPMENT
+-- Creates test users, company, and sample data
 -- ============================================================================
 
-INSERT INTO companies (id, name, legal_name, vat_number, registration_number, address_line1, postal_code, city, country, email)
-VALUES (
+-- Note: This seed file is designed to be run after migrations
+-- Users are created via Supabase Auth, then we add company and membership data
+
+-- ============================================================================
+-- CREATE TEST COMPANY
+-- ============================================================================
+INSERT INTO companies (
+  id,
+  name,
+  legal_name,
+  vat_number,
+  registration_number,
+  address_line1,
+  postal_code,
+  city,
+  country,
+  email,
+  phone,
+  website,
+  settings
+) VALUES (
   '00000000-0000-0000-0000-000000000001',
-  'BOTFORCE GmbH',
+  'BOTFORCE',
   'BOTFORCE GmbH',
   'ATU12345678',
   'FN 123456a',
-  'Teststraße 1',
-  '1010',
+  'Mariahilfer Straße 1',
+  '1060',
   'Vienna',
   'AT',
-  'office@botforce.at'
+  'office@botforce.at',
+  '+43 1 234 5678',
+  'https://www.botforce.at',
+  '{
+    "default_payment_terms_days": 14,
+    "invoice_prefix": "INV",
+    "credit_note_prefix": "CN",
+    "default_tax_rate": "standard_20",
+    "mileage_rate": 0.42
+  }'::jsonb
 );
 
 -- ============================================================================
--- Create test users (you need to create these via Supabase Auth first)
--- These are placeholder UUIDs - replace with actual auth.users IDs
+-- NOTE: Users must be created via Supabase Auth
+-- After running this seed, create these users in the Supabase Dashboard:
+--
+-- 1. admin@botforce.at (password: password123) - Superadmin
+-- 2. employee@botforce.at (password: password123) - Employee
+-- 3. accountant@botforce.at (password: password123) - Accountant
+--
+-- Then run the membership inserts below with the correct user IDs
 -- ============================================================================
 
--- To create test users:
--- 1. Go to Supabase Dashboard > Authentication > Users
--- 2. Create users with these emails:
---    - admin@botforce.at (superadmin)
---    - employee1@botforce.at (employee)
---    - accountant@botforce.at (accountant)
--- 3. Update the UUIDs below with the actual user IDs
-
--- Placeholder for manual profile creation after auth users exist:
--- INSERT INTO profiles (id, email, first_name, last_name) VALUES
--- ('ADMIN-UUID-HERE', 'admin@botforce.at', 'Admin', 'User'),
--- ('EMPLOYEE-UUID-HERE', 'employee1@botforce.at', 'Test', 'Employee'),
--- ('ACCOUNTANT-UUID-HERE', 'accountant@botforce.at', 'Test', 'Accountant');
-
--- Company memberships (update UUIDs after creating auth users):
--- INSERT INTO company_members (company_id, user_id, role) VALUES
--- ('00000000-0000-0000-0000-000000000001', 'ADMIN-UUID-HERE', 'superadmin'),
--- ('00000000-0000-0000-0000-000000000001', 'EMPLOYEE-UUID-HERE', 'employee'),
--- ('00000000-0000-0000-0000-000000000001', 'ACCOUNTANT-UUID-HERE', 'accountant');
+-- Placeholder for company members (update user IDs after creating users via Auth)
+-- These will be inserted after users are created in auth.users
 
 -- ============================================================================
--- Create test customers
+-- SAMPLE CUSTOMERS
 -- ============================================================================
-
-INSERT INTO customers (id, company_id, name, legal_name, vat_number, email, address_line1, postal_code, city, country, payment_terms_days)
-VALUES
-  ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'Acme Corp', 'Acme Corporation GmbH', 'ATU87654321', 'billing@acme.at', 'Kundenstraße 1', '1020', 'Vienna', 'AT', 30),
-  ('00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'Beta Industries', 'Beta Industries KG', 'ATU11223344', 'finance@beta.at', 'Industrieweg 5', '4020', 'Linz', 'AT', 14),
-  ('00000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001', 'Gamma Solutions', 'Gamma Solutions OG', NULL, 'office@gamma.at', 'Technikgasse 10', '8010', 'Graz', 'AT', 14);
+INSERT INTO customers (
+  id,
+  company_id,
+  name,
+  legal_name,
+  vat_number,
+  email,
+  address_line1,
+  postal_code,
+  city,
+  country,
+  payment_terms_days,
+  default_tax_rate
+) VALUES
+(
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000001',
+  'TechCorp Austria',
+  'TechCorp Austria GmbH',
+  'ATU87654321',
+  'contact@techcorp.at',
+  'Kärntner Ring 10',
+  '1010',
+  'Vienna',
+  'AT',
+  14,
+  'standard_20'
+),
+(
+  '00000000-0000-0000-0000-000000000011',
+  '00000000-0000-0000-0000-000000000001',
+  'Digital Solutions Germany',
+  'Digital Solutions GmbH',
+  'DE123456789',
+  'info@digitalsolutions.de',
+  'Friedrichstraße 100',
+  '10117',
+  'Berlin',
+  'DE',
+  30,
+  'reverse_charge'
+),
+(
+  '00000000-0000-0000-0000-000000000012',
+  '00000000-0000-0000-0000-000000000001',
+  'StartupXYZ',
+  'StartupXYZ e.U.',
+  NULL,
+  'hello@startupxyz.at',
+  'Gumpendorfer Straße 50',
+  '1060',
+  'Vienna',
+  'AT',
+  7,
+  'standard_20'
+);
 
 -- ============================================================================
--- Create test projects
+-- SAMPLE PROJECTS
 -- ============================================================================
-
-INSERT INTO projects (id, company_id, customer_id, name, code, description, billing_type, hourly_rate, budget_hours, is_active)
-VALUES
-  ('00000000-0000-0000-0000-000000000021', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'Website Redesign', 'ACME-WEB', 'Complete website redesign for Acme Corp', 'hourly', 120.00, 200, true),
-  ('00000000-0000-0000-0000-000000000022', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'Mobile App', 'ACME-APP', 'Native mobile application', 'hourly', 140.00, 500, true),
-  ('00000000-0000-0000-0000-000000000023', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000012', 'ERP Integration', 'BETA-ERP', 'ERP system integration project', 'fixed', NULL, NULL, true),
-  ('00000000-0000-0000-0000-000000000024', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000013', 'Consulting', 'GAMMA-CON', 'Technical consulting services', 'hourly', 150.00, NULL, true);
-
--- Set fixed price for BETA-ERP
-UPDATE projects SET fixed_price = 25000.00 WHERE id = '00000000-0000-0000-0000-000000000023';
+INSERT INTO projects (
+  id,
+  company_id,
+  customer_id,
+  name,
+  code,
+  description,
+  billing_type,
+  hourly_rate,
+  budget_hours,
+  is_active,
+  is_billable
+) VALUES
+(
+  '00000000-0000-0000-0000-000000000020',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000010',
+  'Website Redesign',
+  'TC-WEB',
+  'Complete website redesign with new CMS',
+  'hourly',
+  120.00,
+  200,
+  TRUE,
+  TRUE
+),
+(
+  '00000000-0000-0000-0000-000000000021',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000010',
+  'Mobile App Development',
+  'TC-APP',
+  'Native mobile app for iOS and Android',
+  'fixed',
+  NULL,
+  500,
+  TRUE,
+  TRUE
+),
+(
+  '00000000-0000-0000-0000-000000000022',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000011',
+  'API Integration',
+  'DS-API',
+  'REST API integration with third-party services',
+  'hourly',
+  150.00,
+  80,
+  TRUE,
+  TRUE
+),
+(
+  '00000000-0000-0000-0000-000000000023',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000012',
+  'MVP Development',
+  'SX-MVP',
+  'Minimum viable product development',
+  'hourly',
+  100.00,
+  300,
+  TRUE,
+  TRUE
+);
 
 -- ============================================================================
--- Note: Project assignments, time entries, documents, and expenses
--- should be created after auth users are set up, as they reference user IDs.
+-- HELPER FUNCTION: Setup test users after auth creation
+-- Run this function after creating users via Supabase Auth Dashboard
 -- ============================================================================
+CREATE OR REPLACE FUNCTION setup_test_users()
+RETURNS void AS $$
+DECLARE
+  v_admin_id UUID;
+  v_employee_id UUID;
+  v_accountant_id UUID;
+BEGIN
+  -- Get user IDs by email
+  SELECT id INTO v_admin_id FROM auth.users WHERE email = 'admin@botforce.at';
+  SELECT id INTO v_employee_id FROM auth.users WHERE email = 'employee@botforce.at';
+  SELECT id INTO v_accountant_id FROM auth.users WHERE email = 'accountant@botforce.at';
 
--- Example project assignment (update USER-UUID after creating auth users):
--- INSERT INTO project_assignments (company_id, project_id, user_id)
--- VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000021', 'EMPLOYEE-UUID-HERE');
+  -- Create company memberships
+  IF v_admin_id IS NOT NULL THEN
+    INSERT INTO company_members (company_id, user_id, role, hourly_rate, is_active, joined_at)
+    VALUES ('00000000-0000-0000-0000-000000000001', v_admin_id, 'superadmin', 150.00, TRUE, NOW())
+    ON CONFLICT (company_id, user_id) DO NOTHING;
+  END IF;
 
-SELECT 'Seed data loaded successfully. Remember to create auth users and update references.' AS status;
+  IF v_employee_id IS NOT NULL THEN
+    INSERT INTO company_members (company_id, user_id, role, hourly_rate, is_active, joined_at)
+    VALUES ('00000000-0000-0000-0000-000000000001', v_employee_id, 'employee', 80.00, TRUE, NOW())
+    ON CONFLICT (company_id, user_id) DO NOTHING;
+
+    -- Assign employee to projects
+    INSERT INTO project_assignments (project_id, user_id, is_active)
+    VALUES
+      ('00000000-0000-0000-0000-000000000020', v_employee_id, TRUE),
+      ('00000000-0000-0000-0000-000000000023', v_employee_id, TRUE)
+    ON CONFLICT (project_id, user_id) DO NOTHING;
+  END IF;
+
+  IF v_accountant_id IS NOT NULL THEN
+    INSERT INTO company_members (company_id, user_id, role, hourly_rate, is_active, joined_at)
+    VALUES ('00000000-0000-0000-0000-000000000001', v_accountant_id, 'accountant', NULL, TRUE, NOW())
+    ON CONFLICT (company_id, user_id) DO NOTHING;
+  END IF;
+
+  RAISE NOTICE 'Test users setup complete';
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- INSTRUCTIONS
+-- ============================================================================
+-- 1. Run migrations: supabase db push
+-- 2. Create users in Supabase Dashboard (Authentication > Users):
+--    - admin@botforce.at / password123
+--    - employee@botforce.at / password123
+--    - accountant@botforce.at / password123
+-- 3. Run: SELECT setup_test_users();
+-- ============================================================================

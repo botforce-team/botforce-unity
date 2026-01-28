@@ -1,115 +1,119 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Pencil, Play, Pause, Trash2, FileText, Loader2 } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { MoreHorizontal, Play, Pause, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui'
 import {
-  toggleRecurringTemplate,
-  deleteRecurringTemplate,
-  generateInvoiceFromTemplate,
+  toggleRecurringInvoiceActive,
+  deleteRecurringInvoice,
 } from '@/app/actions/recurring-invoices'
+import type { RecurringInvoiceTemplate } from '@/types'
 
-interface RecurringTemplateActionsProps {
-  templateId: string
-  isActive: boolean
+interface RecurringActionsProps {
+  template: RecurringInvoiceTemplate
 }
 
-export function RecurringTemplateActions({ templateId, isActive }: RecurringTemplateActionsProps) {
-  const router = useRouter()
-  const [loading, setLoading] = useState<string | null>(null)
+export function RecurringActions({ template }: RecurringActionsProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  async function handleToggle() {
-    setLoading('toggle')
-    const result = await toggleRecurringTemplate(templateId, !isActive)
-    if (result.error) {
-      alert(result.error)
-    }
-    setLoading(null)
-    router.refresh()
+  const handleToggleActive = () => {
+    startTransition(async () => {
+      const result = await toggleRecurringInvoiceActive(template.id, !template.is_active)
+      if (!result.success) {
+        alert(result.error)
+      }
+      setIsOpen(false)
+    })
   }
 
-  async function handleDelete() {
-    if (!confirm('Delete this recurring invoice template? This cannot be undone.')) return
-    setLoading('delete')
-    const result = await deleteRecurringTemplate(templateId)
-    if (result.error) {
-      alert(result.error)
-      setLoading(null)
-    } else {
-      router.refresh()
-    }
-  }
-
-  async function handleGenerateNow() {
-    if (!confirm('Generate an invoice from this template now?')) return
-    setLoading('generate')
-    const result = await generateInvoiceFromTemplate(templateId)
-    if (result.error) {
-      alert(result.error)
-      setLoading(null)
-    } else if (result.data) {
-      router.push(`/documents/${(result.data as { id: string }).id}`)
-    }
-  }
-
-  const buttonStyle = {
-    background: 'rgba(255, 255, 255, 0.08)',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deleteRecurringInvoice(template.id)
+      if (!result.success) {
+        alert(result.error)
+      }
+      setShowDeleteConfirm(false)
+      setIsOpen(false)
+    })
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={handleGenerateNow}
-        disabled={loading !== null}
-        className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[rgba(255,255,255,0.12)] disabled:opacity-50"
-        style={buttonStyle}
-        title="Generate invoice now"
+    <div className="relative">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isPending}
       >
-        {loading === 'generate' ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <FileText className="h-3.5 w-3.5" />
-        )}
-        Generate Now
-      </button>
+        <MoreHorizontal className="h-4 w-4" />
+      </Button>
 
-      <Link
-        href={`/documents/recurring/${templateId}/edit`}
-        className="rounded-[8px] p-2 text-[rgba(232,236,255,0.6)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white"
-        title="Edit template"
-      >
-        <Pencil className="h-4 w-4" />
-      </Link>
-
-      <button
-        onClick={handleToggle}
-        disabled={loading !== null}
-        className="rounded-[8px] p-2 text-[rgba(232,236,255,0.6)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-white disabled:opacity-50"
-        title={isActive ? 'Pause template' : 'Activate template'}
-      >
-        {loading === 'toggle' ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : isActive ? (
-          <Pause className="h-4 w-4" />
-        ) : (
-          <Play className="h-4 w-4" />
-        )}
-      </button>
-
-      <button
-        onClick={handleDelete}
-        disabled={loading !== null}
-        className="rounded-[8px] p-2 text-[rgba(239,68,68,0.7)] transition-colors hover:bg-[rgba(239,68,68,0.1)] hover:text-[#ef4444] disabled:opacity-50"
-        title="Delete template"
-      >
-        {loading === 'delete' ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Trash2 className="h-4 w-4" />
-        )}
-      </button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setIsOpen(false)
+              setShowDeleteConfirm(false)
+            }}
+          />
+          <div className="absolute right-0 z-50 mt-1 w-48 rounded-md border border-border bg-surface shadow-lg">
+            {showDeleteConfirm ? (
+              <div className="p-3">
+                <p className="text-sm text-text-primary mb-3">Delete this template?</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={isPending}
+                  >
+                    {isPending ? 'Deleting...' : 'Delete'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="py-1">
+                <button
+                  onClick={handleToggleActive}
+                  disabled={isPending}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-hover disabled:opacity-50"
+                >
+                  {template.is_active ? (
+                    <>
+                      <Pause className="h-4 w-4" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4" />
+                      Activate
+                    </>
+                  )}
+                </button>
+                <hr className="my-1 border-border" />
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-surface-hover"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
