@@ -135,7 +135,7 @@ export function PaymentsList({ initialPayments = [], isConnected }: PaymentsList
                     <p className="text-sm font-medium text-text-primary">
                       {formatCurrency(payment.amount / 100, payment.currency)}
                     </p>
-                    <Badge variant="outline" className={`text-xs ${status.color}`}>
+                    <Badge variant="secondary" className={`text-xs ${status.color}`}>
                       {status.label}
                     </Badge>
                   </div>

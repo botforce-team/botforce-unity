@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
+import Image from 'next/image'
+import { Upload, X, Loader2 } from 'lucide-react'
 import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import {
   updateCompanyInfo,
   updateCompanySettings,
   updateUserProfile,
+  uploadCompanyLogo,
+  removeCompanyLogo,
   type CompanyInfo,
   type CompanySettings,
 } from '@/app/actions/settings'
@@ -17,6 +21,9 @@ interface CompanyInfoFormProps {
 export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(company.logo_url)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -48,13 +55,121 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
     })
   }
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploadingLogo(true)
+    const formData = new FormData()
+    formData.append('logo', file)
+
+    try {
+      const result = await uploadCompanyLogo(formData)
+      if (result.success && result.data?.logo_url) {
+        setLogoUrl(result.data.logo_url)
+        setMessage({ type: 'success', text: 'Logo uploaded successfully' })
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to upload logo' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to upload logo' })
+    } finally {
+      setIsUploadingLogo(false)
+      setTimeout(() => setMessage(null), 3000)
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    setIsUploadingLogo(true)
+    try {
+      const result = await removeCompanyLogo()
+      if (result.success) {
+        setLogoUrl(null)
+        setMessage({ type: 'success', text: 'Logo removed successfully' })
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to remove logo' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to remove logo' })
+    } finally {
+      setIsUploadingLogo(false)
+      setTimeout(() => setMessage(null), 3000)
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Company Information</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Logo Upload Section */}
+          <div className="space-y-3">
+            <Label>Company Logo</Label>
+            <div className="flex items-start gap-4">
+              {logoUrl ? (
+                <div className="relative group">
+                  <div className="relative h-20 w-40 rounded-lg border border-border overflow-hidden bg-white">
+                    <Image
+                      src={logoUrl}
+                      alt="Company logo"
+                      fill
+                      className="object-contain p-2"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    disabled={isUploadingLogo}
+                    className="absolute -top-2 -right-2 p-1 rounded-full bg-danger text-white hover:bg-danger/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove logo"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center h-20 w-40 rounded-lg border-2 border-dashed border-border hover:border-primary cursor-pointer bg-surface transition-colors"
+                >
+                  {isUploadingLogo ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+                  ) : (
+                    <>
+                      <Upload className="h-6 w-6 text-text-muted mb-1" />
+                      <span className="text-xs text-text-muted">Upload logo</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="text-xs text-text-muted space-y-1">
+                <p>Recommended size: 400x200 pixels</p>
+                <p>Formats: PNG, JPEG, SVG, WebP</p>
+                <p>Max size: 2MB</p>
+                {logoUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                    className="mt-2"
+                  >
+                    Change logo
+                  </Button>
+                )}
+              </div>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+              onChange={handleLogoUpload}
+              className="hidden"
+            />
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Company Name *</Label>

@@ -223,6 +223,118 @@ export async function updateUserProfile(data: {
 }
 
 /**
+ * Upload company logo and update logo_url
+ */
+export async function uploadCompanyLogo(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const { data: membership } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership?.company_id) {
+    return { success: false, error: 'No company found' }
+  }
+
+  if (membership.role !== 'superadmin') {
+    return { success: false, error: 'Only superadmins can update company logo' }
+  }
+
+  const file = formData.get('logo') as File
+  if (!file || file.size === 0) {
+    return { success: false, error: 'No file provided' }
+  }
+
+  // Validate file type
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    return { success: false, error: 'Invalid file type. Allowed: PNG, JPEG, GIF, SVG, WebP' }
+  }
+
+  // Validate file size (max 2MB)
+  if (file.size > 2 * 1024 * 1024) {
+    return { success: false, error: 'File too large. Maximum size is 2MB' }
+  }
+
+  // Generate unique filename
+  const ext = file.name.split('.').pop() || 'png'
+  const filename = `${membership.company_id}/logo-${Date.now()}.${ext}`
+
+  // Upload to Supabase Storage
+  const { error: uploadError } = await supabase.storage
+    .from('company-assets')
+    .upload(filename, file, {
+      cacheControl: '3600',
+      upsert: true,
+    })
+
+  if (uploadError) {
+    console.error('Upload error:', uploadError)
+    return { success: false, error: 'Failed to upload logo' }
+  }
+
+  // Get public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('company-assets')
+    .getPublicUrl(filename)
+
+  // Update company with new logo URL
+  const { error: updateError } = await supabase
+    .from('companies')
+    .update({
+      logo_url: publicUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', membership.company_id)
+
+  if (updateError) {
+    return { success: false, error: updateError.message }
+  }
+
+  revalidatePath('/settings')
+  return { success: true, data: { logo_url: publicUrl } }
+}
+
+/**
+ * Remove company logo
+ */
+export async function removeCompanyLogo(): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const { data: membership } = await supabase
+    .from('company_members')
+    .select('company_id, role')
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership?.company_id) {
+    return { success: false, error: 'No company found' }
+  }
+
+  if (membership.role !== 'superadmin') {
+    return { success: false, error: 'Only superadmins can remove company logo' }
+  }
+
+  // Update company to remove logo URL
+  const { error } = await supabase
+    .from('companies')
+    .update({
+      logo_url: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', membership.company_id)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+/**
  * Get dashboard stats for overdue invoices
  */
 export async function getDashboardStats(): Promise<ActionResult> {

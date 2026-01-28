@@ -6,16 +6,16 @@ import { Send, X, Building2, CreditCard, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 
 interface RevolutAccount {
   id: string
-  name: string
+  name: string | null
   balance: number
   currency: string
-  iban?: string
+  iban?: string | null
 }
 
 interface CreatePaymentDialogProps {
@@ -109,25 +109,17 @@ export function CreatePaymentDialog({ accounts, onClose }: CreatePaymentDialogPr
             <div className="space-y-2">
               <Label htmlFor="sourceAccount">From Account</Label>
               <Select
+                id="sourceAccount"
                 value={formData.sourceAccountId}
-                onValueChange={(value) => setFormData({ ...formData, sourceAccountId: value })}
+                onChange={(e) => setFormData({ ...formData, sourceAccountId: e.target.value })}
+                required
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        <span>{account.name}</span>
-                        <span className="text-text-muted">
-                          ({formatBalance(account.balance, account.currency)})
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                <option value="">Select account</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name || 'Unnamed Account'} ({formatBalance(account.balance, account.currency)})
+                  </option>
+                ))}
               </Select>
               {selectedAccount?.iban && (
                 <p className="text-xs text-text-muted">IBAN: {selectedAccount.iban}</p>
@@ -193,18 +185,14 @@ export function CreatePaymentDialog({ accounts, onClose }: CreatePaymentDialogPr
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
                 <Select
+                  id="currency"
                   value={formData.currency}
-                  onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
-                    <SelectItem value="CHF">CHF</SelectItem>
-                  </SelectContent>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                  <option value="GBP">GBP</option>
+                  <option value="CHF">CHF</option>
                 </Select>
               </div>
             </div>

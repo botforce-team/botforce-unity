@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
+import { SidebarProvider } from '@/components/layout/sidebar-context'
 import { Breadcrumbs } from '@/components/ui'
 import { type UserRole } from '@/types'
 
@@ -44,16 +45,19 @@ export default async function AuthenticatedLayout({
   const userEmail = profile?.email || user.email || ''
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar userRole={userRole} userName={userName} userEmail={userEmail} />
+    <SidebarProvider>
+      <div className="min-h-screen bg-background">
+        <Sidebar userRole={userRole} userName={userName} userEmail={userEmail} />
 
-      <div className="ml-64">
-        <Header />
-        <main className="p-6">
-          <Breadcrumbs />
-          {children}
-        </main>
+        {/* Main content - responsive margin */}
+        <div className="lg:ml-64">
+          <Header />
+          <main className="p-4 lg:p-6">
+            <Breadcrumbs />
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   )
 }

@@ -7,10 +7,10 @@ import { CreatePaymentDialog } from './create-payment-dialog'
 
 interface RevolutAccount {
   id: string
-  name: string
+  name: string | null
   balance: number
   currency: string
-  iban?: string
+  iban?: string | null
 }
 
 interface PaymentActionsProps {

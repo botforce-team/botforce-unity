@@ -62,6 +62,7 @@ export async function GET(
   const lines = document.lines || []
   const isInvoice = document.document_type === 'invoice'
   const docTypeLabel = isInvoice ? 'Invoice' : 'Credit Note'
+  const logoUrl = company.logo_url || null
 
   // Generate HTML
   const html = `
@@ -93,6 +94,17 @@ export async function GET(
       display: flex;
       justify-content: space-between;
       margin-bottom: 40px;
+    }
+    .company-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .company-logo {
+      max-height: 60px;
+      max-width: 200px;
+      object-fit: contain;
+      margin-bottom: 8px;
     }
     .company-info h1 {
       font-size: 24px;
@@ -254,6 +266,7 @@ export async function GET(
   <div class="container">
     <div class="header">
       <div class="company-info">
+        ${logoUrl ? `<img src="${logoUrl}" alt="${company.name || 'Company'}" class="company-logo" />` : ''}
         <h1>${company.name || 'Company Name'}</h1>
         ${company.legal_name && company.legal_name !== company.name ? `<p>${company.legal_name}</p>` : ''}
         ${company.address_line1 ? `<p>${company.address_line1}</p>` : ''}

@@ -131,7 +131,7 @@ export function GlobalSearch() {
       />
 
       {/* Search dialog */}
-      <div className="fixed left-1/2 top-[20%] z-50 w-full max-w-lg -translate-x-1/2 rounded-lg border border-border bg-background-elevated shadow-xl">
+      <div className="fixed left-1/2 top-[10%] z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 rounded-lg border border-border bg-background-elevated shadow-xl sm:top-[20%]">
         {/* Search input */}
         <div className="flex items-center gap-3 border-b border-border px-4">
           <Search className="h-5 w-5 text-text-muted" />

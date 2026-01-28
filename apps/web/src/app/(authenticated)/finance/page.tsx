@@ -22,6 +22,8 @@ import { RevolutBalanceCard } from '@/components/finance/revolut-balance-card'
 import { RevolutTransactions } from '@/components/finance/revolut-transactions'
 import { PaymentActions } from '@/components/finance/payment-actions'
 import { PaymentsList } from '@/components/finance/payments-list'
+import { TaxInsightsWidget } from '@/components/finance/tax-insights-widget'
+import { env } from '@/lib/env'
 
 export default async function FinancePage() {
   const [
@@ -49,6 +51,7 @@ export default async function FinancePage() {
   ])
 
   const isRevolutConnected = revolutConnection.data?.status === 'active'
+  const hasAnthropicKey = !!env.ANTHROPIC_API_KEY
 
   const categoryLabels: Record<string, string> = {
     mileage: 'Mileage',
@@ -227,15 +230,20 @@ export default async function FinancePage() {
         </Card>
       </div>
 
-      {/* Cash Forecast */}
-      <Card>
-        <CardHeader>
-          <CardTitle>12-Week Cash Forecast</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CashFlowChart data={cashForecast} />
-        </CardContent>
-      </Card>
+      {/* Cash Forecast and AI Tax Insights */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>12-Week Cash Forecast</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CashFlowChart data={cashForecast} />
+          </CardContent>
+        </Card>
+
+        {/* AI Tax Insights */}
+        <TaxInsightsWidget hasApiKey={hasAnthropicKey} />
+      </div>
 
       {/* Bottom Row */}
       <div className="grid gap-6 lg:grid-cols-2">
