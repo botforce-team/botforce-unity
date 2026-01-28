@@ -307,17 +307,32 @@ export class RevolutClient {
   }
 
   /**
-   * Create a counterparty
+   * Create a counterparty (external bank account)
    */
   async createCounterparty(counterparty: {
-    name?: string
+    company_name?: string
+    individual_name?: { first_name: string; last_name: string }
     profile_type?: 'personal' | 'business'
     bank_country: string
     currency: string
     iban?: string
     bic?: string
-  }): Promise<RevolutCounterparty> {
-    return this.request<RevolutCounterparty>('POST', '/counterparty', counterparty)
+  }): Promise<RevolutCounterparty & { id: string }> {
+    return this.request<RevolutCounterparty & { id: string }>('POST', '/counterparty', counterparty)
+  }
+
+  /**
+   * Delete a counterparty
+   */
+  async deleteCounterparty(counterpartyId: string): Promise<void> {
+    return this.request<void>('DELETE', `/counterparty/${counterpartyId}`)
+  }
+
+  /**
+   * Cancel a pending payment
+   */
+  async cancelPayment(paymentId: string): Promise<void> {
+    return this.request<void>('DELETE', `/transaction/${paymentId}`)
   }
 }
 

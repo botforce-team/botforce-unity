@@ -31,4 +31,5 @@ export const env = {
   REVOLUT_CLIENT_ID: getEnvVar('REVOLUT_CLIENT_ID'),
   REVOLUT_SANDBOX: getEnvVar('REVOLUT_SANDBOX') !== 'false', // Default to sandbox mode
   REVOLUT_REDIRECT_URI: getEnvVar('REVOLUT_REDIRECT_URI') || `${getEnvVar('NEXT_PUBLIC_APP_URL') || 'http://localhost:3000'}/api/revolut/callback`,
+  REVOLUT_WEBHOOK_SECRET: getEnvVar('REVOLUT_WEBHOOK_SECRET'),
 }

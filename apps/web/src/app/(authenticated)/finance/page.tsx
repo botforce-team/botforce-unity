@@ -20,6 +20,8 @@ import { RevenueChart } from './revenue-chart'
 import { CashFlowChart } from './cash-flow-chart'
 import { RevolutBalanceCard } from '@/components/finance/revolut-balance-card'
 import { RevolutTransactions } from '@/components/finance/revolut-transactions'
+import { PaymentActions } from '@/components/finance/payment-actions'
+import { PaymentsList } from '@/components/finance/payments-list'
 
 export default async function FinancePage() {
   const [
@@ -62,11 +64,17 @@ export default async function FinancePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Finance</h1>
-        <p className="mt-1 text-text-secondary">
-          Overview of your financial performance
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-primary">Finance</h1>
+          <p className="mt-1 text-text-secondary">
+            Overview of your financial performance
+          </p>
+        </div>
+        <PaymentActions
+          accounts={revolutAccounts.data || []}
+          isConnected={isRevolutConnected}
+        />
       </div>
 
       {/* KPI Cards */}
@@ -316,6 +324,9 @@ export default async function FinancePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Payments List (outgoing payments via Revolut) */}
+      <PaymentsList isConnected={isRevolutConnected} />
 
       {/* Bank Transactions (from Revolut) */}
       {isRevolutConnected && (revolutTransactions.data?.length || 0) > 0 && (
