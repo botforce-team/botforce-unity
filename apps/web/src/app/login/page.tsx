@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -39,9 +40,13 @@ function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-1 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-          <span className="text-xl font-bold text-white">B</span>
-        </div>
+        <Image
+          src="/logo.png"
+          alt="BOTFORCE"
+          width={64}
+          height={64}
+          className="mx-auto mb-4 rounded-lg"
+        />
         <CardTitle className="text-2xl">Welcome back</CardTitle>
         <CardDescription>
           Sign in to your BOTFORCE Unity account
@@ -91,9 +96,13 @@ function LoginFormFallback() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-1 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-          <span className="text-xl font-bold text-white">B</span>
-        </div>
+        <Image
+          src="/logo.png"
+          alt="BOTFORCE"
+          width={64}
+          height={64}
+          className="mx-auto mb-4 rounded-lg"
+        />
         <CardTitle className="text-2xl">Welcome back</CardTitle>
         <CardDescription>
           Sign in to your BOTFORCE Unity account

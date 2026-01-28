@@ -5,9 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import { calculateMileageExpense } from '@/lib/mileage'
 import type { Expense, ActionResult, PaginatedResult, ExpenseStatus, ExpenseCategory, TaxRate } from '@/types'
 
-// Re-export the mileage helper for use in client components
-export { calculateMileageExpense } from '@/lib/mileage'
-
 export interface ExpensesFilter {
   projectId?: string
   userId?: string

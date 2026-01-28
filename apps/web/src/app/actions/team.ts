@@ -1,19 +1,19 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { teamInviteTemplate } from '@/lib/email/templates'
 import { env } from '@/lib/env'
 import type { ActionResult, UserRole, CompanyMember, Profile } from '@/types'
 
-interface TeamMemberWithProfile extends CompanyMember {
-  profile: Profile
+interface TeamMemberWithProfile extends Omit<CompanyMember, 'profile'> {
+  profile: Profile | null
 }
 
 export async function getTeamMembers(): Promise<ActionResult<TeamMemberWithProfile[]>> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createAdminClient()
     const client = await createClient()
 
     const { data: { user } } = await client.auth.getUser()
@@ -59,7 +59,7 @@ export async function inviteTeamMember(
   hourlyRate?: number
 ): Promise<ActionResult<{ inviteId: string }>> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createAdminClient()
     const client = await createClient()
 
     const { data: { user } } = await client.auth.getUser()
@@ -195,7 +195,7 @@ export async function updateTeamMember(
   data: { role?: UserRole; hourlyRate?: number | null }
 ): Promise<ActionResult> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createAdminClient()
     const client = await createClient()
 
     const { data: { user } } = await client.auth.getUser()
@@ -245,7 +245,7 @@ export async function updateTeamMember(
 
 export async function deactivateMember(memberId: string): Promise<ActionResult> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createAdminClient()
     const client = await createClient()
 
     const { data: { user } } = await client.auth.getUser()
@@ -298,7 +298,7 @@ export async function deactivateMember(memberId: string): Promise<ActionResult> 
 
 export async function reactivateMember(memberId: string): Promise<ActionResult> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createAdminClient()
     const client = await createClient()
 
     const { data: { user } } = await client.auth.getUser()

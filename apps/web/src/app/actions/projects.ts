@@ -329,8 +329,13 @@ export async function getAvailableTeamMembers(projectId: string) {
 
   const assignedUserIds = new Set((currentAssignments || []).map(a => a.user_id))
 
-  // Filter out already assigned members
-  return (companyMembers || []).filter(m => !assignedUserIds.has(m.user_id))
+  // Filter out already assigned members and transform profile array to single object
+  return (companyMembers || [])
+    .filter(m => !assignedUserIds.has(m.user_id))
+    .map(m => ({
+      ...m,
+      profile: Array.isArray(m.profile) ? m.profile[0] || null : m.profile
+    }))
 }
 
 export async function addTeamMember(

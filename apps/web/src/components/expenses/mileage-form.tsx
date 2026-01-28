@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Car, ArrowRight, RotateCcw } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select } from '@/components/ui'
-import { createMileageExpense, calculateMileageExpense } from '@/app/actions/expenses'
+import { createMileageExpense } from '@/app/actions/expenses'
+import { calculateMileageExpense } from '@/lib/mileage'
 import { useToast } from '@/components/ui/use-toast'
 
 interface MileageFormProps {

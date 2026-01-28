@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 import type { CompanyMember, Profile, UserRole } from '@/types'
 
-interface TeamMemberWithProfile extends CompanyMember {
+interface TeamMemberWithProfile extends Omit<CompanyMember, 'profile'> {
   profile: Profile | null
 }
 
@@ -241,7 +241,7 @@ export function TeamMembersList({ members, currentUserId, isSuperadmin }: TeamMe
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     onClick={() => setIsInviteOpen(false)}
                     disabled={isLoading === 'invite'}
                   >
@@ -277,7 +277,7 @@ export function TeamMembersList({ members, currentUserId, isSuperadmin }: TeamMe
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{name}</span>
                       {isCurrentUser && (
-                        <Badge variant="outline" className="text-xs">You</Badge>
+                        <Badge variant="secondary" className="text-xs">You</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-text-muted">
@@ -308,7 +308,7 @@ export function TeamMembersList({ members, currentUserId, isSuperadmin }: TeamMe
                       </Select>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         onClick={() => setEditingMember(null)}
                       >
                         Done
@@ -393,13 +393,13 @@ export function TeamMembersList({ members, currentUserId, isSuperadmin }: TeamMe
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="text-gray-500">
+                    <Badge variant="secondary" className="text-gray-500">
                       Inactive
                     </Badge>
 
                     {isSuperadmin && (
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleReactivate(member.id, name)}
                         disabled={isLoading === member.id}

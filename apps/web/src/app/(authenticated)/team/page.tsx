@@ -1,16 +1,16 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { TeamMembersList } from './team-members-list'
 import type { CompanyMember, Profile } from '@/types'
 
-interface TeamMemberWithProfile extends CompanyMember {
+interface TeamMemberWithProfile extends Omit<CompanyMember, 'profile'> {
   profile: Profile | null
 }
 
 export default async function TeamPage() {
   const client = await createClient()
-  const supabase = await createServiceClient()
+  const supabase = await createAdminClient()
 
   const { data: { user } } = await client.auth.getUser()
   if (!user) {

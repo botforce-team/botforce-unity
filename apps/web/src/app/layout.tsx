@@ -2,8 +2,21 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'BOTFORCE Unity',
+  title: {
+    default: 'BOTFORCE Unity',
+    template: '%s | BOTFORCE Unity',
+  },
   description: 'Invoicing, time tracking, expense management for Austrian/EU service companies',
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
+  openGraph: {
+    title: 'BOTFORCE Unity',
+    description: 'Invoicing, time tracking, expense management for Austrian/EU service companies',
+    images: ['/logo.png'],
+    type: 'website',
+  },
 }
 
 export default function RootLayout({
