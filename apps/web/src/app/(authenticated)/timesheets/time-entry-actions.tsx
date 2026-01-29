@@ -75,8 +75,11 @@ export function TimeEntryActions({ entry, isAdmin }: TimeEntryActionsProps) {
   const canApprove = isAdmin && entry.status === 'submitted'
   const canDelete = entry.status === 'draft' || entry.status === 'rejected'
 
+  // Debug: log to console
+  console.log('TimeEntryActions:', { entryId: entry.id, status: entry.status, isAdmin, canApprove })
+
   return (
-    <div className="relative">
+    <div className="relative" title={`isAdmin: ${isAdmin}, status: ${entry.status}`}>
       <Button
         variant="ghost"
         size="sm"
