@@ -75,7 +75,12 @@ export function MonthPicker({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-64 rounded-md border border-border bg-background p-3 shadow-lg">
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute z-50 bottom-full mb-1 w-64 rounded-md border border-border bg-background p-3 shadow-lg max-h-80 overflow-y-auto">
           {/* Year Navigation */}
           <div className="mb-3 flex items-center justify-between">
             <Button
@@ -153,6 +158,7 @@ export function MonthPicker({
             </Button>
           </div>
         </div>
+        </>
       )}
     </div>
   )

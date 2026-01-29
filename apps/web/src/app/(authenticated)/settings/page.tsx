@@ -30,10 +30,15 @@ export default async function SettingsPage({
 
   // Get company info (for superadmins)
   let companyInfo = null
+  let companyError = null
   let revolutConnection = null
   if (isSuperAdmin) {
     const companyResult = await getCompanyInfo()
     companyInfo = companyResult.data
+    if (!companyResult.success) {
+      companyError = companyResult.error
+      console.error('Failed to load company info:', companyResult.error)
+    }
 
     // Get Revolut connection status
     const revolutResult = await getRevolutConnection()
@@ -77,6 +82,13 @@ export default async function SettingsPage({
         </div>
       )}
 
+      {/* Debug info - remove after fixing */}
+      <div className="p-3 bg-yellow-100 text-yellow-800 rounded text-xs font-mono">
+        <p>Debug: isSuperAdmin={String(isSuperAdmin)}, role={role}</p>
+        <p>companyInfo={companyInfo ? 'loaded' : 'null'}, companyError={companyError || 'none'}</p>
+        <p>user={user?.id ? 'authenticated' : 'not authenticated'}</p>
+      </div>
+
       <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -89,15 +101,31 @@ export default async function SettingsPage({
           {profile && <UserProfileForm profile={profile} />}
         </TabsContent>
 
-        {isSuperAdmin && companyInfo && (
+        {isSuperAdmin && (
           <TabsContent value="company" className="mt-6">
-            <CompanyInfoForm company={companyInfo} />
+            {companyError ? (
+              <div className="p-4 bg-danger-muted text-danger rounded-lg">
+                Failed to load company info: {companyError}
+              </div>
+            ) : companyInfo ? (
+              <CompanyInfoForm company={companyInfo} />
+            ) : (
+              <div className="p-4 text-text-muted">Loading...</div>
+            )}
           </TabsContent>
         )}
 
-        {isSuperAdmin && companyInfo && (
+        {isSuperAdmin && (
           <TabsContent value="invoicing" className="mt-6">
-            <InvoiceSettingsForm settings={companyInfo.settings} />
+            {companyError ? (
+              <div className="p-4 bg-danger-muted text-danger rounded-lg">
+                Failed to load company settings: {companyError}
+              </div>
+            ) : companyInfo ? (
+              <InvoiceSettingsForm settings={companyInfo.settings} />
+            ) : (
+              <div className="p-4 text-text-muted">Loading...</div>
+            )}
           </TabsContent>
         )}
 

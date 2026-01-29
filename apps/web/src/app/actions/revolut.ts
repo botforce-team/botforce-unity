@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 interface ActionResult<T = unknown> {
@@ -78,10 +78,18 @@ export interface RevolutPaymentInfo {
  */
 export async function getRevolutConnection(): Promise<ActionResult<RevolutConnectionInfo | null>> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  const { data: membership } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Use admin client to bypass RLS for company_members
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -118,10 +126,17 @@ export async function getRevolutConnection(): Promise<ActionResult<RevolutConnec
  */
 export async function getRevolutAccounts(): Promise<ActionResult<RevolutAccountInfo[]>> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  const { data: membership } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -153,10 +168,17 @@ export async function getRevolutAccounts(): Promise<ActionResult<RevolutAccountI
  */
 export async function getRevolutBalances(): Promise<ActionResult<Record<string, number>>> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  const { data: membership } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -209,10 +231,17 @@ export async function getRevolutTransactions(
   filters: TransactionFilters = {}
 ): Promise<ActionResult<{ transactions: RevolutTransactionInfo[]; total: number }>> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  const { data: membership } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -302,6 +331,7 @@ export async function reconcileTransaction(
   }
 ): Promise<ActionResult> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   const {
     data: { user },
@@ -311,7 +341,7 @@ export async function reconcileTransaction(
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
@@ -372,10 +402,17 @@ export async function getRevolutPayments(
   filters: { status?: string; limit?: number; offset?: number } = {}
 ): Promise<ActionResult<{ payments: RevolutPaymentInfo[]; total: number }>> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  const { data: membership } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -431,6 +468,7 @@ export async function createPayment(data: {
   documentId?: string
 }): Promise<ActionResult<{ paymentId: string }>> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   const {
     data: { user },
@@ -440,7 +478,7 @@ export async function createPayment(data: {
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
@@ -521,10 +559,17 @@ export async function getRevolutSyncLogs(
   duration_ms: number | null
 }>>> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  const { data: membership } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 

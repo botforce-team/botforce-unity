@@ -330,7 +330,7 @@ export function TeamMembersList({ members, currentUserId, isSuperadmin }: TeamMe
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                       {menuOpen === member.id && (
-                        <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-md border border-border bg-background py-1 shadow-lg">
+                        <div className="absolute right-0 bottom-full z-10 mb-1 w-48 rounded-md border border-border bg-background py-1 shadow-lg max-h-80 overflow-y-auto">
                           <button
                             onClick={() => {
                               setEditingMember(member.id)

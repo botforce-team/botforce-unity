@@ -96,7 +96,7 @@ export function DocumentActions({ document }: DocumentActionsProps) {
               setShowCancelConfirm(false)
             }}
           />
-          <div className="absolute right-0 z-50 mt-1 w-64 rounded-md border border-border bg-surface shadow-lg">
+          <div className="absolute right-0 bottom-full z-50 mb-1 w-64 rounded-md border border-border bg-surface shadow-lg max-h-80 overflow-y-auto">
             {showDeleteConfirm ? (
               <div className="p-3">
                 <p className="text-sm text-text-primary mb-3">Delete this {document.document_type}?</p>

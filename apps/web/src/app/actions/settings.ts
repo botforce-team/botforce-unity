@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 interface ActionResult {
@@ -40,10 +40,21 @@ export interface CompanyInfo {
  */
 export async function getCompanyInfo(): Promise<ActionResult & { data?: CompanyInfo }> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
-  const { data: membership } = await supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Use admin client to bypass RLS for company_members
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -51,7 +62,8 @@ export async function getCompanyInfo(): Promise<ActionResult & { data?: CompanyI
     return { success: false, error: 'No company found' }
   }
 
-  const { data: company, error } = await supabase
+  // Use admin client for companies too
+  const { data: company, error } = await adminClient
     .from('companies')
     .select('*')
     .eq('id', membership.company_id)
@@ -70,9 +82,18 @@ export async function getCompanyInfo(): Promise<ActionResult & { data?: CompanyI
 export async function updateCompanyInfo(data: Partial<Omit<CompanyInfo, 'id' | 'settings'>>): Promise<ActionResult> {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
   const { data: membership } = await supabase
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -106,9 +127,18 @@ export async function updateCompanyInfo(data: Partial<Omit<CompanyInfo, 'id' | '
 export async function updateCompanySettings(settings: Partial<CompanySettings>): Promise<ActionResult> {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
   const { data: membership } = await supabase
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -228,9 +258,18 @@ export async function updateUserProfile(data: {
 export async function uploadCompanyLogo(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
   const { data: membership } = await supabase
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -303,9 +342,18 @@ export async function uploadCompanyLogo(formData: FormData): Promise<ActionResul
 export async function removeCompanyLogo(): Promise<ActionResult> {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
   const { data: membership } = await supabase
     .from('company_members')
     .select('company_id, role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -340,9 +388,18 @@ export async function removeCompanyLogo(): Promise<ActionResult> {
 export async function getDashboardStats(): Promise<ActionResult> {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
   const { data: membership } = await supabase
     .from('company_members')
     .select('role')
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle()
 
