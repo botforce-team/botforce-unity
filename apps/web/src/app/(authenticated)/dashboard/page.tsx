@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@/components/ui'
 import { Clock, FileText, Receipt, TrendingUp, Users, FolderOpen, Building2, ArrowRight, AlertTriangle, CheckCircle } from 'lucide-react'
 import { OverdueInvoicesWidget } from '@/components/dashboard/overdue-invoices-widget'
@@ -11,8 +11,9 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Get user role
-  const { data: membership } = await supabase
+  // Get user role (use admin client to bypass RLS)
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('role')
     .eq('user_id', user?.id)

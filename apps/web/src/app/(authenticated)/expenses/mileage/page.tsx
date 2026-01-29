@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { Breadcrumbs } from '@/components/ui'
 import { MileageForm } from '@/components/expenses/mileage-form'
 import { getProjectsForSelect } from '@/app/actions/time-entries'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
   title: 'Log Mileage | BOTFORCE Unity',
@@ -23,7 +23,8 @@ export default async function MileagePage({ searchParams }: MileagePageProps) {
   let mileageRate = 0.42 // Default Austrian rate
 
   if (user) {
-    const { data: membership } = await supabase
+    const adminClient = await createAdminClient()
+    const { data: membership } = await adminClient
       .from('company_members')
       .select('company_id')
       .eq('user_id', user.id)

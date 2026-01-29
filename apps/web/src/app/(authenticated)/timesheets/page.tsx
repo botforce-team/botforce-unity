@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Plus, Clock, Calendar, LayoutList, LayoutGrid } from 'lucide-react'
 import { Button, Card, Badge, EmptyState } from '@/components/ui'
 import { getMyTimeEntries } from '@/app/actions/time-entries'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { TimeEntryActions } from './time-entry-actions'
 import { BulkActions } from './bulk-actions'
 import { TimesheetGroupedView } from './timesheet-grouped-view'
@@ -38,8 +38,9 @@ export default async function TimesheetsPage({ searchParams }: TimesheetsPagePro
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Check if user is admin for approval permissions
-  const { data: membership } = await supabase
+  // Check if user is admin for approval permissions (use admin client to bypass RLS)
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('role')
     .eq('user_id', user?.id)

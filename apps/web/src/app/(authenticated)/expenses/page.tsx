@@ -4,7 +4,7 @@ import { Button, Card, Badge, EmptyState } from '@/components/ui'
 import { getMyExpenses } from '@/app/actions/expenses'
 import { getProjectsForSelect } from '@/app/actions/time-entries'
 import { expenseCategories } from '@/lib/constants'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { ExpenseActions } from './expense-actions'
 import { ExpenseFilters } from './expense-filters'
 import { getMonthYearDisplay, getYearMonthKey } from '@/lib/utils'
@@ -48,7 +48,9 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: membership } = await supabase
+  // Use admin client to bypass RLS for company_members query
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('role')
     .eq('user_id', user?.id)
