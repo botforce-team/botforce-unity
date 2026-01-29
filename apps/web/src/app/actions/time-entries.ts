@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { TimeEntry, ActionResult, PaginatedResult, TimeEntryStatus } from '@/types'
 
 export interface TimeEntriesFilter {
@@ -146,7 +146,8 @@ export async function createTimeEntry(
   }
 
   // Get the user's company and project info
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, hourly_rate')
     .eq('user_id', user.id)

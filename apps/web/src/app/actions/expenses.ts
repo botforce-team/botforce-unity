@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { calculateMileageExpense } from '@/lib/mileage'
 import type { Expense, ActionResult, PaginatedResult, ExpenseStatus, ExpenseCategory, TaxRate } from '@/types'
 
@@ -146,7 +146,8 @@ export async function createExpense(
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)
@@ -415,7 +416,8 @@ export async function uploadReceipt(
   }
 
   // Get user's company
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)
@@ -538,7 +540,8 @@ export async function createMileageExpense(input: {
   }
 
   // Get company and mileage rate
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)

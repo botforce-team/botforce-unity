@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { Project, ActionResult, PaginatedResult } from '@/types'
 
 export interface ProjectsFilter {
@@ -122,7 +122,8 @@ export async function createProject(
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)
@@ -299,7 +300,8 @@ export async function getAvailableTeamMembers(projectId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)
@@ -309,7 +311,7 @@ export async function getAvailableTeamMembers(projectId: string) {
   if (!membership) return []
 
   // Get all active company members
-  const { data: companyMembers } = await supabase
+  const { data: companyMembers } = await adminClient
     .from('company_members')
     .select(`
       user_id,

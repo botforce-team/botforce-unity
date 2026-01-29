@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type {
   RecurringInvoiceTemplate,
   RecurringInvoiceLine,
@@ -131,7 +131,8 @@ export async function createRecurringInvoice(
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)

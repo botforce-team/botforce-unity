@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export interface TimeReportEntry {
   project_id: string
@@ -43,7 +43,8 @@ export async function getTimeReport(filters: TimeReportFilters): Promise<{
     return { data: [], totals: { total_hours: 0, billable_hours: 0, non_billable_hours: 0, billable_amount: 0 }, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)
@@ -176,7 +177,8 @@ export async function getRevenueReport(filters: RevenueReportFilters): Promise<{
     return { data: [], totals: { invoiced_amount: 0, paid_amount: 0, outstanding_amount: 0, invoice_count: 0 }, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id')
     .eq('user_id', user.id)
