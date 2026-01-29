@@ -1,16 +1,21 @@
 import Link from 'next/link'
-import { Plus, Receipt, Calendar, Building2 } from 'lucide-react'
+import { Plus, Receipt, Calendar, Building2, FileText } from 'lucide-react'
 import { Button, Card, Badge, EmptyState } from '@/components/ui'
 import { getMyExpenses } from '@/app/actions/expenses'
+import { getProjectsForSelect } from '@/app/actions/time-entries'
 import { expenseCategories } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/server'
 import { ExpenseActions } from './expense-actions'
+import { ExpenseFilters } from './expense-filters'
+import { getMonthYearDisplay, getYearMonthKey } from '@/lib/utils'
 
 interface ExpensesPageProps {
   searchParams: Promise<{
     page?: string
     status?: string
     category?: string
+    project?: string
+    month?: string
     from?: string
     to?: string
   }>
@@ -24,11 +29,21 @@ const statusColors: Record<string, 'secondary' | 'info' | 'success' | 'danger' |
   exported: 'warning',
 }
 
+const statusLabels: Record<string, string> = {
+  draft: 'Entwurf',
+  submitted: 'Eingereicht',
+  approved: 'Genehmigt',
+  rejected: 'Abgelehnt',
+  exported: 'Exportiert',
+}
+
 export default async function ExpensesPage({ searchParams }: ExpensesPageProps) {
   const params = await searchParams
   const page = Number(params.page) || 1
   const status = params.status as any
   const category = params.category as any
+  const projectId = params.project
+  const yearMonth = params.month
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -42,10 +57,15 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
 
   const isAdmin = membership?.role === 'superadmin'
 
+  // Fetch projects for filter dropdown
+  const projects = await getProjectsForSelect()
+
   const { data: expenses, total, totalPages } = await getMyExpenses({
     page,
     status,
     category,
+    projectId,
+    yearMonth,
     limit: 50,
   })
 
@@ -64,61 +84,135 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
     .filter((e) => e.status === 'draft' || e.status === 'submitted')
     .reduce((sum, e) => sum + e.amount, 0)
 
+  // Group by month for summary
+  const expensesByMonth = expenses.reduce((acc, expense) => {
+    const monthKey = getYearMonthKey(expense.date)
+    if (!acc[monthKey]) {
+      acc[monthKey] = { total: 0, count: 0 }
+    }
+    acc[monthKey].total += expense.amount
+    acc[monthKey].count++
+    return acc
+  }, {} as Record<string, { total: number; count: number }>)
+
+  // Build URL helper
+  const buildUrl = (newParams: Record<string, string | undefined>) => {
+    const urlParams = new URLSearchParams()
+    if (status && !('status' in newParams)) urlParams.set('status', status)
+    if (projectId && !('project' in newParams)) urlParams.set('project', projectId)
+    if (yearMonth && !('month' in newParams)) urlParams.set('month', yearMonth)
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value !== undefined) urlParams.set(key, value)
+    })
+    const query = urlParams.toString()
+    return `/expenses${query ? `?${query}` : ''}`
+  }
+
+  // Check if we should show invoice creation hint
+  const approvedExpensesForProject = projectId && yearMonth
+    ? expenses.filter(e => e.status === 'approved').length
+    : 0
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Expenses</h1>
+          <h1 className="text-2xl font-semibold">Ausgaben</h1>
           <p className="text-text-secondary mt-1">
-            {formatCurrency(totalAmount)} total • {formatCurrency(pendingAmount)} pending
+            {formatCurrency(totalAmount)} gesamt
+            {pendingAmount > 0 && ` • ${formatCurrency(pendingAmount)} ausstehend`}
           </p>
         </div>
-        <Link href="/expenses/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Expense
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {approvedExpensesForProject > 0 && (
+            <Link href={`/documents/new-from-project?project=${projectId}&month=${yearMonth}`}>
+              <Button variant="outline">
+                <FileText className="mr-2 h-4 w-4" />
+                Rechnung erstellen
+              </Button>
+            </Link>
+          )}
+          <Link href="/expenses/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Ausgabe hinzufügen
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
+      <ExpenseFilters
+        projects={projects}
+        selectedProject={projectId}
+        selectedMonth={yearMonth}
+      />
+
+      {/* Status Filters */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Link
-          href="/expenses"
+          href={buildUrl({ status: undefined })}
           className={`px-3 py-1 rounded-md transition-colors ${!status ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
         >
-          All
+          Alle
         </Link>
         <Link
-          href="/expenses?status=draft"
+          href={buildUrl({ status: 'draft' })}
           className={`px-3 py-1 rounded-md transition-colors ${status === 'draft' ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
         >
-          Draft
+          Entwurf
         </Link>
         <Link
-          href="/expenses?status=submitted"
+          href={buildUrl({ status: 'submitted' })}
           className={`px-3 py-1 rounded-md transition-colors ${status === 'submitted' ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
         >
-          Submitted
+          Eingereicht
         </Link>
         <Link
-          href="/expenses?status=approved"
+          href={buildUrl({ status: 'approved' })}
           className={`px-3 py-1 rounded-md transition-colors ${status === 'approved' ? 'bg-surface-hover text-text-primary' : 'text-text-secondary hover:bg-surface-hover'}`}
         >
-          Approved
+          Genehmigt
         </Link>
       </div>
+
+      {/* Monthly Summary (when filtering by project) */}
+      {projectId && Object.keys(expensesByMonth).length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(expensesByMonth)
+            .sort(([a], [b]) => b.localeCompare(a))
+            .map(([month, data]) => (
+              <Link
+                key={month}
+                href={buildUrl({ month })}
+                className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                  yearMonth === month
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-surface border-border hover:border-primary'
+                }`}
+              >
+                {getMonthYearDisplay(month)}
+                <span className="ml-2 text-xs opacity-75">
+                  {formatCurrency(data.total)}
+                </span>
+              </Link>
+            ))}
+        </div>
+      )}
 
       {expenses.length === 0 ? (
         <EmptyState
           icon={Receipt}
-          title="No expenses found"
-          description="Track your business expenses by adding your first expense"
+          title="Keine Ausgaben gefunden"
+          description={projectId || yearMonth
+            ? "Keine Ausgaben für die ausgewählten Filter gefunden"
+            : "Verfolge deine Geschäftsausgaben, indem du deine erste Ausgabe hinzufügst"
+          }
           action={
             <Link href="/expenses/new">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Expense
+                Ausgabe hinzufügen
               </Button>
             </Link>
           }
@@ -130,13 +224,13 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border text-left text-sm font-medium text-text-secondary">
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Description</th>
-                    <th className="px-4 py-3">Project</th>
-                    <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3">Datum</th>
+                    <th className="px-4 py-3">Kategorie</th>
+                    <th className="px-4 py-3">Beschreibung</th>
+                    <th className="px-4 py-3">Projekt</th>
+                    <th className="px-4 py-3 text-right">Betrag</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="px-4 py-3 text-right">Aktionen</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -180,17 +274,17 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                         </div>
                         {expense.tax_amount > 0 && (
                           <div className="text-xs text-text-muted">
-                            incl. {formatCurrency(expense.tax_amount)} tax
+                            inkl. {formatCurrency(expense.tax_amount)} USt
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={statusColors[expense.status]}>
-                          {expense.status}
+                          {statusLabels[expense.status] || expense.status}
                         </Badge>
                         {expense.is_reimbursable && (
                           <Badge variant="info" className="ml-1 text-xs">
-                            Reimb.
+                            Erstatt.
                           </Badge>
                         )}
                       </td>
@@ -207,20 +301,20 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-text-secondary">
-                Showing {(page - 1) * 50 + 1} to {Math.min(page * 50, total)} of {total} expenses
+                Zeige {(page - 1) * 50 + 1} bis {Math.min(page * 50, total)} von {total} Ausgaben
               </p>
               <div className="flex items-center gap-2">
                 {page > 1 && (
-                  <Link href={`/expenses?page=${page - 1}${status ? `&status=${status}` : ''}`}>
+                  <Link href={buildUrl({ page: String(page - 1) })}>
                     <Button variant="outline" size="sm">
-                      Previous
+                      Zurück
                     </Button>
                   </Link>
                 )}
                 {page < totalPages && (
-                  <Link href={`/expenses?page=${page + 1}${status ? `&status=${status}` : ''}`}>
+                  <Link href={buildUrl({ page: String(page + 1) })}>
                     <Button variant="outline" size="sm">
-                      Next
+                      Weiter
                     </Button>
                   </Link>
                 )}

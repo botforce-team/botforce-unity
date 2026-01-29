@@ -153,3 +153,58 @@ export function calculateGross(netAmount: number, vatRate: number): number {
  * Austrian kilometergeld rate (EUR per km)
  */
 export const KILOMETERGELD_RATE = 0.42
+
+/**
+ * German month names (Austrian style - Jänner instead of Januar)
+ */
+export const MONTHS_DE = [
+  'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+]
+
+/**
+ * Format month and year for Austrian locale
+ * @example formatMonthYear('2024-01-15') // "Jänner 2024"
+ */
+export function formatMonthYear(date: Date | string, locale = 'de-AT'): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(d)
+}
+
+/**
+ * Get year-month key from date string
+ * @example getYearMonthKey('2024-01-15') // "2024-01"
+ */
+export function getYearMonthKey(date: string): string {
+  return date.substring(0, 7)
+}
+
+/**
+ * Parse year-month key into year and month numbers
+ * @example parseYearMonthKey('2024-01') // { year: 2024, month: 1 }
+ */
+export function parseYearMonthKey(key: string): { year: number; month: number } {
+  const [year, month] = key.split('-').map(Number)
+  return { year, month }
+}
+
+/**
+ * Get date range for a given year-month
+ * @example getDateRangeForMonth('2024-01') // { from: '2024-01-01', to: '2024-01-31' }
+ */
+export function getDateRangeForMonth(yearMonth: string): { from: string; to: string } {
+  const { year, month } = parseYearMonthKey(yearMonth)
+  const from = `${year}-${String(month).padStart(2, '0')}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  return { from, to }
+}
+
+/**
+ * Get display name for year-month
+ * @example getMonthYearDisplay('2024-01') // "Jänner 2024"
+ */
+export function getMonthYearDisplay(yearMonth: string): string {
+  const { year, month } = parseYearMonthKey(yearMonth)
+  return `${MONTHS_DE[month - 1]} ${year}`
+}

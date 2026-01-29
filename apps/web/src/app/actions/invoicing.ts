@@ -411,3 +411,246 @@ export async function getCustomerUnbilledSummary(customerId: string): Promise<{
     projectCount: projects.size,
   }
 }
+
+// Get unbilled items for a specific project and month
+export async function getUnbilledItemsForProjectMonth(
+  projectId: string,
+  yearMonth: string
+): Promise<{
+  timeEntries: UnbilledTimeEntry[]
+  expenses: UnbilledExpense[]
+  summary: {
+    totalHours: number
+    totalTimeValue: number
+    totalExpenses: number
+    estimatedTotal: number
+  }
+}> {
+  const supabase = await createClient()
+
+  // Parse month range
+  const [year, month] = yearMonth.split('-').map(Number)
+  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+  // Fetch time entries for the project and month
+  const { data: timeData } = await supabase
+    .from('time_entries')
+    .select(`
+      id, project_id, date, hours, description, hourly_rate, is_billable,
+      project:projects(name, code, hourly_rate, customer_id, customer:customers(id, name))
+    `)
+    .eq('project_id', projectId)
+    .eq('status', 'approved')
+    .eq('is_billable', true)
+    .is('document_id', null)
+    .gte('date', monthStart)
+    .lte('date', monthEnd)
+    .order('date', { ascending: false })
+
+  // Fetch expenses for the project and month
+  const { data: expenseData } = await supabase
+    .from('expenses')
+    .select(`
+      id, project_id, date, amount, tax_rate, tax_amount, category, description, merchant, is_reimbursable,
+      project:projects(name, code, customer_id, customer:customers(id, name))
+    `)
+    .eq('project_id', projectId)
+    .eq('status', 'approved')
+    .eq('is_reimbursable', true)
+    .is('export_id', null)
+    .gte('date', monthStart)
+    .lte('date', monthEnd)
+    .order('date', { ascending: false })
+
+  const timeEntries: UnbilledTimeEntry[] = (timeData || []).map((entry: any) => ({
+    id: entry.id,
+    project_id: entry.project_id,
+    project_name: entry.project?.name || 'Unknown',
+    project_code: entry.project?.code || '',
+    customer_id: entry.project?.customer?.id || '',
+    customer_name: entry.project?.customer?.name || 'Unknown',
+    date: entry.date,
+    hours: entry.hours,
+    description: entry.description,
+    hourly_rate: entry.hourly_rate || entry.project?.hourly_rate || 0,
+    is_billable: entry.is_billable,
+  }))
+
+  const expenses: UnbilledExpense[] = (expenseData || []).map((exp: any) => ({
+    id: exp.id,
+    project_id: exp.project_id,
+    project_name: exp.project?.name || null,
+    project_code: exp.project?.code || null,
+    customer_id: exp.project?.customer?.id || null,
+    customer_name: exp.project?.customer?.name || null,
+    date: exp.date,
+    amount: exp.amount,
+    tax_rate: exp.tax_rate,
+    tax_amount: exp.tax_amount,
+    category: exp.category,
+    description: exp.description,
+    merchant: exp.merchant,
+    is_reimbursable: exp.is_reimbursable,
+  }))
+
+  // Calculate summary
+  const totalHours = timeEntries.reduce((sum, e) => sum + e.hours, 0)
+  const totalTimeValue = timeEntries.reduce((sum, e) => sum + (e.hours * (e.hourly_rate || 0)), 0)
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount + e.tax_amount, 0)
+
+  return {
+    timeEntries,
+    expenses,
+    summary: {
+      totalHours,
+      totalTimeValue,
+      totalExpenses,
+      estimatedTotal: totalTimeValue + totalExpenses,
+    },
+  }
+}
+
+// Get projects with unbilled items for quick invoice dropdown
+export async function getProjectsWithUnbilledItems(): Promise<{
+  value: string
+  label: string
+  code: string
+  customerId: string
+  customerName: string
+  unbilledHours: number
+  unbilledExpenseCount: number
+  unbilledMonths: string[]
+}[]> {
+  const supabase = await createClient()
+
+  // Get all projects with unbilled time entries
+  const { data: timeData } = await supabase
+    .from('time_entries')
+    .select(`
+      project_id, date, hours,
+      project:projects(id, name, code, customer:customers(id, name))
+    `)
+    .eq('status', 'approved')
+    .eq('is_billable', true)
+    .is('document_id', null)
+
+  // Get all projects with unbilled expenses
+  const { data: expenseData } = await supabase
+    .from('expenses')
+    .select(`
+      project_id, date,
+      project:projects(id, name, code, customer:customers(id, name))
+    `)
+    .eq('status', 'approved')
+    .eq('is_reimbursable', true)
+    .is('export_id', null)
+    .not('project_id', 'is', null)
+
+  // Aggregate by project
+  const projectMap = new Map<string, {
+    project: any
+    hours: number
+    expenseCount: number
+    months: Set<string>
+  }>()
+
+  ;(timeData || []).forEach((entry: any) => {
+    if (!entry.project_id || !entry.project) return
+    const key = entry.project_id
+    if (!projectMap.has(key)) {
+      projectMap.set(key, {
+        project: entry.project,
+        hours: 0,
+        expenseCount: 0,
+        months: new Set(),
+      })
+    }
+    const data = projectMap.get(key)!
+    data.hours += entry.hours || 0
+    data.months.add(entry.date.substring(0, 7))
+  })
+
+  ;(expenseData || []).forEach((exp: any) => {
+    if (!exp.project_id || !exp.project) return
+    const key = exp.project_id
+    if (!projectMap.has(key)) {
+      projectMap.set(key, {
+        project: exp.project,
+        hours: 0,
+        expenseCount: 0,
+        months: new Set(),
+      })
+    }
+    const data = projectMap.get(key)!
+    data.expenseCount++
+    data.months.add(exp.date.substring(0, 7))
+  })
+
+  // Convert to array and sort by hours (most work first)
+  return Array.from(projectMap.entries())
+    .map(([projectId, data]) => ({
+      value: projectId,
+      label: `${data.project.name} (${data.project.code})`,
+      code: data.project.code || '',
+      customerId: data.project.customer?.id || '',
+      customerName: data.project.customer?.name || 'Unknown',
+      unbilledHours: Math.round(data.hours * 100) / 100,
+      unbilledExpenseCount: data.expenseCount,
+      unbilledMonths: Array.from(data.months).sort((a, b) => b.localeCompare(a)),
+    }))
+    .sort((a, b) => b.unbilledHours - a.unbilledHours)
+}
+
+// Create invoice for a specific project and month
+export interface InvoiceForProjectMonthInput {
+  project_id: string
+  year_month: string
+  include_time_entries?: boolean
+  include_expenses?: boolean
+  payment_terms_days?: number
+  notes?: string | null
+  group_by?: 'project' | 'entry' | 'summary'
+}
+
+export async function createInvoiceForProjectMonth(
+  input: InvoiceForProjectMonthInput
+): Promise<ActionResult<Document>> {
+  const {
+    project_id,
+    year_month,
+    include_time_entries = true,
+    include_expenses = true,
+    payment_terms_days,
+    notes,
+    group_by = 'project',
+  } = input
+
+  // Get unbilled items for this project and month
+  const { timeEntries, expenses } = await getUnbilledItemsForProjectMonth(project_id, year_month)
+
+  // Get customer from project
+  const supabase = await createClient()
+  const { data: project } = await supabase
+    .from('projects')
+    .select('customer_id')
+    .eq('id', project_id)
+    .single()
+
+  if (!project?.customer_id) {
+    return { success: false, error: 'Project has no customer assigned' }
+  }
+
+  // Build the input for createInvoiceFromEntries
+  const createInput: InvoiceFromEntriesInput = {
+    customer_id: project.customer_id,
+    time_entry_ids: include_time_entries ? timeEntries.map(e => e.id) : [],
+    expense_ids: include_expenses ? expenses.map(e => e.id) : [],
+    payment_terms_days,
+    notes,
+    group_by,
+  }
+
+  return createInvoiceFromEntries(createInput)
+}

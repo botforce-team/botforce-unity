@@ -235,6 +235,40 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================================
+-- HELPER FUNCTION: Add any user as superadmin
+-- Use this to add your actual user account to the company
+-- ============================================================================
+CREATE OR REPLACE FUNCTION add_user_as_superadmin(user_email TEXT)
+RETURNS TEXT AS $$
+DECLARE
+  v_user_id UUID;
+  v_company_id UUID := '00000000-0000-0000-0000-000000000001';
+BEGIN
+  -- Get user ID by email
+  SELECT id INTO v_user_id FROM auth.users WHERE email = user_email;
+
+  IF v_user_id IS NULL THEN
+    RETURN 'Error: User with email ' || user_email || ' not found in auth.users';
+  END IF;
+
+  -- Check if company exists
+  IF NOT EXISTS (SELECT 1 FROM companies WHERE id = v_company_id) THEN
+    -- Create the company if it doesn't exist
+    INSERT INTO companies (id, name, legal_name, country, settings)
+    VALUES (v_company_id, 'BOTFORCE', 'BOTFORCE GmbH', 'AT', '{}'::jsonb);
+  END IF;
+
+  -- Create company membership
+  INSERT INTO company_members (company_id, user_id, role, hourly_rate, is_active, joined_at)
+  VALUES (v_company_id, v_user_id, 'superadmin', 150.00, TRUE, NOW())
+  ON CONFLICT (company_id, user_id)
+  DO UPDATE SET role = 'superadmin', is_active = TRUE;
+
+  RETURN 'Success: User ' || user_email || ' added as superadmin to BOTFORCE company';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
 -- INSTRUCTIONS
 -- ============================================================================
 -- 1. Run migrations: supabase db push
@@ -243,4 +277,7 @@ $$ LANGUAGE plpgsql;
 --    - employee@botforce.at / password123
 --    - accountant@botforce.at / password123
 -- 3. Run: SELECT setup_test_users();
+--
+-- OR: To add your own user as superadmin:
+-- Run: SELECT add_user_as_superadmin('your-email@example.com');
 -- ============================================================================

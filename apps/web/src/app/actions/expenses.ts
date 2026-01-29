@@ -12,6 +12,7 @@ export interface ExpensesFilter {
   category?: ExpenseCategory
   dateFrom?: string
   dateTo?: string
+  yearMonth?: string // Format: "2024-01" - filters by month
   page?: number
   limit?: number
 }
@@ -32,6 +33,7 @@ export async function getExpenses(
     category,
     dateFrom,
     dateTo,
+    yearMonth,
     page = 1,
     limit = 50,
   } = filter
@@ -61,6 +63,15 @@ export async function getExpenses(
   }
   if (dateTo) {
     query = query.lte('date', dateTo)
+  }
+
+  // Month filter (overrides dateFrom/dateTo if provided)
+  if (yearMonth) {
+    const [year, month] = yearMonth.split('-').map(Number)
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month, 0).getDate()
+    const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    query = query.gte('date', monthStart).lte('date', monthEnd)
   }
 
   query = query.order('date', { ascending: false }).order('created_at', { ascending: false })
