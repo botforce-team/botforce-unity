@@ -75,11 +75,8 @@ export function TimeEntryActions({ entry, isAdmin }: TimeEntryActionsProps) {
   const canApprove = isAdmin && entry.status === 'submitted'
   const canDelete = entry.status === 'draft' || entry.status === 'rejected'
 
-  // Debug: log to console
-  console.log('TimeEntryActions:', { entryId: entry.id, status: entry.status, isAdmin, canApprove })
-
   return (
-    <div className="relative" title={`isAdmin: ${isAdmin}, status: ${entry.status}`}>
+    <div className="relative">
       <Button
         variant="ghost"
         size="sm"
@@ -99,7 +96,7 @@ export function TimeEntryActions({ entry, isAdmin }: TimeEntryActionsProps) {
               setShowRejectForm(false)
             }}
           />
-          <div className="absolute right-0 z-50 mt-1 w-56 rounded-md border border-border bg-surface shadow-lg">
+          <div className="absolute right-0 bottom-full z-50 mb-1 w-56 rounded-md border border-border bg-surface shadow-lg max-h-80 overflow-y-auto">
             {showDeleteConfirm ? (
               <div className="p-3">
                 <p className="text-sm text-text-primary mb-3">Delete this entry?</p>
