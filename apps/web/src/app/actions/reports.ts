@@ -56,12 +56,13 @@ export async function getTimeReport(filters: TimeReportFilters): Promise<{
   }
 
   // Build query for time entries
+  // Note: Join profiles directly instead of company_members (no FK between time_entries and company_members)
   let query = supabase
     .from('time_entries')
     .select(`
       id, hours, is_billable, hourly_rate, user_id,
       project:projects!inner(id, name, code, company_id, customer:customers(name)),
-      user:company_members!inner(user_id, profile:profiles(full_name))
+      profile:profiles(full_name)
     `)
     .eq('project.company_id', membership.company_id)
     .eq('status', 'approved')
@@ -118,7 +119,7 @@ export async function getTimeReport(filters: TimeReportFilters): Promise<{
         project_code: entry.project?.code || '',
         customer_name: entry.project?.customer?.name || 'Unknown',
         user_id: entry.user_id,
-        user_name: entry.user?.profile?.full_name || 'Unknown',
+        user_name: entry.profile?.full_name || 'Unknown',
         total_hours: hours,
         billable_hours: isBillable ? hours : 0,
         non_billable_hours: isBillable ? 0 : hours,
