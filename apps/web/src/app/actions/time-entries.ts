@@ -230,12 +230,22 @@ export async function updateTimeEntry(
     hours = Math.max(0, (diffMs - breakMs) / (1000 * 60 * 60))
   }
 
+  // If entry was rejected, reset to draft so it can be resubmitted
+  const shouldResetToDraft = existing?.status === 'rejected'
+
   const { data, error } = await supabase
     .from('time_entries')
     .update({
       ...input,
       hours: hours !== undefined ? Math.round(hours * 100) / 100 : undefined,
       updated_at: new Date().toISOString(),
+      // Reset rejected entries to draft
+      ...(shouldResetToDraft && {
+        status: 'draft',
+        rejected_at: null,
+        rejected_by: null,
+        rejection_reason: null,
+      }),
     })
     .eq('id', id)
     .select()
