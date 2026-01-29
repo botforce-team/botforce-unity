@@ -82,13 +82,6 @@ export default async function SettingsPage({
         </div>
       )}
 
-      {/* Debug info - remove after fixing */}
-      <div className="p-3 bg-yellow-100 text-yellow-800 rounded text-xs font-mono">
-        <p>Debug: isSuperAdmin={String(isSuperAdmin)}, role={role}</p>
-        <p>companyInfo={companyInfo ? 'loaded' : 'null'}, companyError={companyError || 'none'}</p>
-        <p>user={user?.id ? 'authenticated' : 'not authenticated'}</p>
-      </div>
-
       <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
