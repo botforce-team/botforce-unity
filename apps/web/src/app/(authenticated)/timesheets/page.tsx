@@ -125,6 +125,10 @@ export default async function TimesheetsPage({ searchParams }: TimesheetsPagePro
           <h1 className="text-2xl font-semibold">Zeiterfassung</h1>
           <p className="text-text-secondary mt-1">
             {weeklyHours.toFixed(1)} Stunden diese Woche
+            {/* Debug: Remove after testing */}
+            <span className="ml-2 text-xs">
+              [Role: {membership?.role || 'none'}, Admin: {isAdmin ? 'yes' : 'no'}]
+            </span>
           </p>
         </div>
         <Link href="/timesheets/new">
