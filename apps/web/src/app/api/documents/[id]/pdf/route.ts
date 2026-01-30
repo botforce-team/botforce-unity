@@ -370,6 +370,14 @@ export async function GET(
       <p><strong>Payment Terms:</strong> ${document.payment_terms_days} days</p>
       ${document.due_date ? `<p><strong>Please pay by:</strong> ${formatDate(document.due_date)}</p>` : ''}
       ${document.payment_reference ? `<p><strong>Reference:</strong> ${document.payment_reference}</p>` : ''}
+      ${company.bank_name || company.bank_iban ? `
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+          <p style="font-weight: 600; margin-bottom: 4px;">Bank Details:</p>
+          ${company.bank_name ? `<p><strong>Bank:</strong> ${company.bank_name}</p>` : ''}
+          ${company.bank_iban ? `<p><strong>IBAN:</strong> ${company.bank_iban}</p>` : ''}
+          ${company.bank_bic ? `<p><strong>BIC:</strong> ${company.bank_bic}</p>` : ''}
+        </div>
+      ` : ''}
     </div>
 
     <div class="footer">

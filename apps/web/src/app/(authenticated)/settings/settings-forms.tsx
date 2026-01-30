@@ -43,6 +43,9 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
         email: formData.get('email') as string || null,
         phone: formData.get('phone') as string || null,
         website: formData.get('website') as string || null,
+        bank_name: formData.get('bank_name') as string || null,
+        bank_iban: formData.get('bank_iban') as string || null,
+        bank_bic: formData.get('bank_bic') as string || null,
       })
 
       if (result.success) {
@@ -233,6 +236,25 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
             <div className="space-y-2">
               <Label htmlFor="website">Website</Label>
               <Input id="website" name="website" defaultValue={company.website || ''} placeholder="https://" />
+            </div>
+          </div>
+
+          {/* Bank Details Section */}
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-sm font-medium text-text-primary mb-4">Bank Details (for Invoices)</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="bank_name">Bank Name</Label>
+                <Input id="bank_name" name="bank_name" defaultValue={company.bank_name || ''} placeholder="e.g. Erste Bank" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_iban">IBAN</Label>
+                <Input id="bank_iban" name="bank_iban" defaultValue={company.bank_iban || ''} placeholder="AT00 0000 0000 0000 0000" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_bic">BIC/SWIFT</Label>
+                <Input id="bank_bic" name="bank_bic" defaultValue={company.bank_bic || ''} placeholder="GIBAATWWXXX" />
+              </div>
             </div>
           </div>
 

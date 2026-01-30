@@ -32,6 +32,9 @@ export interface CompanyInfo {
   phone: string | null
   website: string | null
   logo_url: string | null
+  bank_name: string | null
+  bank_iban: string | null
+  bank_bic: string | null
   settings: CompanySettings
 }
 
