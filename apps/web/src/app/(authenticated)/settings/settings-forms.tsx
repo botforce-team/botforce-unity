@@ -75,6 +75,10 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
       setMessage({ type: 'error', text: 'Failed to upload logo' })
     } finally {
       setIsUploadingLogo(false)
+      // Reset file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       setTimeout(() => setMessage(null), 3000)
     }
   }
