@@ -81,6 +81,7 @@ export async function getCompanyInfo(): Promise<ActionResult & { data?: CompanyI
  */
 export async function updateCompanyInfo(data: Partial<Omit<CompanyInfo, 'id' | 'settings'>>): Promise<ActionResult> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   const {
     data: { user },
@@ -90,7 +91,7 @@ export async function updateCompanyInfo(data: Partial<Omit<CompanyInfo, 'id' | '
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
@@ -126,6 +127,7 @@ export async function updateCompanyInfo(data: Partial<Omit<CompanyInfo, 'id' | '
  */
 export async function updateCompanySettings(settings: Partial<CompanySettings>): Promise<ActionResult> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   const {
     data: { user },
@@ -135,7 +137,7 @@ export async function updateCompanySettings(settings: Partial<CompanySettings>):
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
@@ -200,8 +202,9 @@ export async function getUserProfile(): Promise<ActionResult> {
     return { success: false, error: error.message }
   }
 
-  // Get membership info
-  const { data: membership } = await supabase
+  // Get membership info using admin client to bypass RLS
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('role, hourly_rate')
     .eq('user_id', user.id)
@@ -257,6 +260,7 @@ export async function updateUserProfile(data: {
  */
 export async function uploadCompanyLogo(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   const {
     data: { user },
@@ -266,7 +270,7 @@ export async function uploadCompanyLogo(formData: FormData): Promise<ActionResul
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
@@ -341,6 +345,7 @@ export async function uploadCompanyLogo(formData: FormData): Promise<ActionResul
  */
 export async function removeCompanyLogo(): Promise<ActionResult> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   const {
     data: { user },
@@ -350,7 +355,7 @@ export async function removeCompanyLogo(): Promise<ActionResult> {
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('company_id, role')
     .eq('user_id', user.id)
@@ -387,6 +392,7 @@ export async function removeCompanyLogo(): Promise<ActionResult> {
  */
 export async function getDashboardStats(): Promise<ActionResult> {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   const {
     data: { user },
@@ -396,7 +402,7 @@ export async function getDashboardStats(): Promise<ActionResult> {
     return { success: false, error: 'Not authenticated' }
   }
 
-  const { data: membership } = await supabase
+  const { data: membership } = await adminClient
     .from('company_members')
     .select('role')
     .eq('user_id', user.id)
