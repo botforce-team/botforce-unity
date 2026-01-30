@@ -41,10 +41,10 @@ export async function GET(
 
     const supabase = await createClient()
 
-    // Fetch document with customer and lines
+    // Fetch document with customer, lines, and project
     const { data: document, error } = await supabase
       .from('documents')
-      .select('*, customer:customers(*), lines:document_lines(*)')
+      .select('*, customer:customers(*), lines:document_lines(*), project:projects(*)')
       .eq('id', id)
       .single()
 
@@ -60,6 +60,7 @@ export async function GET(
   const company = document.company_snapshot || {}
   const customer = document.customer_snapshot || document.customer || {}
   const lines = document.lines || []
+  const project = document.project || null
   const isInvoice = document.document_type === 'invoice'
   const docTypeLabel = isInvoice ? 'Invoice' : 'Credit Note'
   const logoUrl = company.logo_url || null
@@ -73,6 +74,10 @@ export async function GET(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${docTypeLabel} ${document.document_number}</title>
   <style>
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
     * {
       margin: 0;
       padding: 0;
@@ -85,6 +90,9 @@ export async function GET(
       color: #1a1a1a;
       background: white;
       padding: 40px;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
     }
     .container {
       max-width: 800px;
@@ -256,7 +264,9 @@ export async function GET(
     }
     @media print {
       body {
-        padding: 20px;
+        padding: 0;
+        width: 100%;
+        min-height: auto;
       }
       .container {
         max-width: 100%;
@@ -276,6 +286,7 @@ export async function GET(
       <div class="document-info">
         <div class="document-type">${docTypeLabel}</div>
         <div class="document-number">${document.document_number}</div>
+        ${project ? `<div class="project-ref" style="font-size: 11px; color: #666; margin-bottom: 12px;">${project.code} - ${project.name}</div>` : ''}
         <div class="document-meta">
           <p><strong>Issue Date:</strong> ${formatDate(document.issue_date)}</p>
           ${document.due_date ? `<p><strong>Due Date:</strong> ${formatDate(document.due_date)}</p>` : ''}

@@ -322,12 +322,17 @@ export async function createInvoiceFromEntries(
     }
   })
 
+  // Determine document-level project_id (if all lines belong to the same project)
+  const uniqueProjectIds = [...new Set(lines.map((line) => line.project_id).filter(Boolean))]
+  const documentProjectId = uniqueProjectIds.length === 1 ? uniqueProjectIds[0] : null
+
   // Create document
   const { data: document, error: docError } = await supabase
     .from('documents')
     .insert({
       company_id: membership.company_id,
       customer_id: input.customer_id,
+      project_id: documentProjectId,
       document_type: 'invoice',
       status: 'draft',
       payment_terms_days: input.payment_terms_days || customer.payment_terms_days,

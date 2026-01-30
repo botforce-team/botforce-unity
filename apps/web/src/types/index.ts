@@ -233,6 +233,7 @@ export interface Document {
   id: string
   company_id: string
   customer_id: string
+  project_id: string | null
   document_type: DocumentType
   document_number: string | null
   status: DocumentStatus
@@ -257,6 +258,7 @@ export interface Document {
   // Joined
   customer?: Customer
   lines?: DocumentLine[]
+  project?: { id: string; name: string; code: string } | null
 }
 
 export interface CustomerSnapshot {

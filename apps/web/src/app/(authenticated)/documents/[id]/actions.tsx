@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw } from 'lucide-react'
+import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw, Link2 } from 'lucide-react'
 import { Button, Input, Label } from '@/components/ui'
 import {
   issueDocument,
@@ -10,6 +10,7 @@ import {
   cancelDocument,
   deleteDocument,
   refreshDocumentCompanySnapshot,
+  autoDetectDocumentProject,
 } from '@/app/actions/documents'
 import { sendInvoiceEmail, sendPaymentReminder } from '@/app/actions/email'
 import type { Document } from '@/types'
@@ -100,6 +101,17 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
     })
   }
 
+  const handleLinkProject = () => {
+    startTransition(async () => {
+      const result = await autoDetectDocumentProject(document.id)
+      if (result.success) {
+        alert('Project linked! The document now shows the project reference.')
+      } else {
+        alert(result.error || 'Failed to link project')
+      }
+    })
+  }
+
   const canIssue = document.status === 'draft'
   const canMarkPaid = document.status === 'issued'
   const canCancel = document.status === 'draft' || document.status === 'issued'
@@ -107,8 +119,9 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
   const canSendEmail = ['issued', 'paid'].includes(document.status)
   const canSendReminder = document.status === 'issued' && document.document_type === 'invoice'
   const canRefreshCompanyInfo = document.status !== 'cancelled'
+  const canLinkProject = !document.project_id && document.status !== 'cancelled'
 
-  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo) {
+  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo && !canLinkProject) {
     return null
   }
 
@@ -137,6 +150,12 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
           <Button variant="outline" onClick={handleRefreshCompanyInfo} disabled={isPending}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Update Company Info
+          </Button>
+        )}
+        {canLinkProject && (
+          <Button variant="outline" onClick={handleLinkProject} disabled={isPending}>
+            <Link2 className="mr-2 h-4 w-4" />
+            Link Project
           </Button>
         )}
         {canMarkPaid && (

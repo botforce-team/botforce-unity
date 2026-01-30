@@ -27,6 +27,7 @@ export interface DocumentsFilter {
 
 type DocumentWithRelations = Document & {
   customer?: { name: string }
+  project?: { id: string; name: string; code: string } | null
 }
 
 export async function getDocuments(
@@ -97,7 +98,7 @@ export async function getDocument(id: string): Promise<DocumentWithRelations | n
 
   const { data, error } = await supabase
     .from('documents')
-    .select('*, customer:customers(name), lines:document_lines(*)')
+    .select('*, customer:customers(name), lines:document_lines(*), project:projects(id, name, code)')
     .eq('id', id)
     .single()
 
@@ -126,6 +127,7 @@ export interface CreateDocumentInput {
   payment_terms_days?: number
   notes?: string | null
   internal_notes?: string | null
+  project_id?: string | null
   lines: CreateDocumentLineInput[]
 }
 
@@ -212,6 +214,7 @@ export async function createDocument(
     .insert({
       company_id: membership.company_id,
       customer_id: input.customer_id,
+      project_id: input.project_id || null,
       document_type: input.document_type,
       status: 'draft',
       payment_terms_days: paymentTerms,
@@ -662,6 +665,57 @@ export async function refreshDocumentCompanySnapshot(id: string): Promise<Action
   revalidatePath('/documents')
   revalidatePath(`/documents/${id}`)
   return { success: true, data: data as Document }
+}
+
+export async function updateDocumentProject(id: string, projectId: string | null): Promise<ActionResult<Document>> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('documents')
+    .update({
+      project_id: projectId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating document project:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/documents')
+  revalidatePath(`/documents/${id}`)
+  return { success: true, data: data as Document }
+}
+
+export async function autoDetectDocumentProject(id: string): Promise<ActionResult<Document>> {
+  const supabase = await createClient()
+
+  // Get all unique project_ids from document lines
+  const { data: lines, error: linesError } = await supabase
+    .from('document_lines')
+    .select('project_id')
+    .eq('document_id', id)
+    .not('project_id', 'is', null)
+
+  if (linesError) {
+    return { success: false, error: linesError.message }
+  }
+
+  const uniqueProjectIds = [...new Set(lines?.map((l) => l.project_id).filter(Boolean))]
+
+  if (uniqueProjectIds.length === 0) {
+    return { success: false, error: 'No project found in document lines' }
+  }
+
+  if (uniqueProjectIds.length > 1) {
+    return { success: false, error: 'Multiple projects found in document lines' }
+  }
+
+  // Set the single project on the document
+  return updateDocumentProject(id, uniqueProjectIds[0] as string)
 }
 
 // Helper to get customers for select
