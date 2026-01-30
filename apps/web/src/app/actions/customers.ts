@@ -102,6 +102,8 @@ export interface CreateCustomerInput {
   default_tax_rate?: string
   currency?: string
   notes?: string | null
+  skonto_percent?: number | null
+  skonto_days?: number | null
 }
 
 export async function createCustomer(
@@ -151,6 +153,8 @@ export async function createCustomer(
       default_tax_rate: input.default_tax_rate || 'standard_20',
       currency: input.currency || 'EUR',
       notes: input.notes || null,
+      skonto_percent: input.skonto_percent ?? null,
+      skonto_days: input.skonto_days ?? null,
       is_active: true,
     })
     .select()

@@ -98,7 +98,7 @@ export async function getDocument(id: string): Promise<DocumentWithRelations | n
 
   const { data, error } = await supabase
     .from('documents')
-    .select('*, customer:customers(name), lines:document_lines(*), project:projects(id, name, code)')
+    .select('*, customer:customers(name), lines:document_lines(*)')
     .eq('id', id)
     .single()
 
@@ -107,7 +107,18 @@ export async function getDocument(id: string): Promise<DocumentWithRelations | n
     return null
   }
 
-  return data as DocumentWithRelations
+  // Fetch project separately if project_id exists (no FK constraint in DB)
+  let project = null
+  if (data.project_id) {
+    const { data: projectData } = await supabase
+      .from('projects')
+      .select('id, name, code')
+      .eq('id', data.project_id)
+      .single()
+    project = projectData
+  }
+
+  return { ...data, project } as DocumentWithRelations
 }
 
 export interface CreateDocumentLineInput {
@@ -496,6 +507,8 @@ export async function issueDocument(id: string): Promise<ActionResult<Document>>
       due_date: dueDate,
       customer_snapshot: customerSnapshot,
       company_snapshot: companySnapshot,
+      skonto_percent: document.customer.skonto_percent ?? null,
+      skonto_days: document.customer.skonto_days ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)

@@ -41,10 +41,10 @@ export async function GET(
 
     const supabase = await createClient()
 
-    // Fetch document with customer, lines, and project
+    // Fetch document with customer and lines
     const { data: document, error } = await supabase
       .from('documents')
-      .select('*, customer:customers(*), lines:document_lines(*), project:projects(*)')
+      .select('*, customer:customers(*), lines:document_lines(*)')
       .eq('id', id)
       .single()
 
@@ -57,13 +57,29 @@ export async function GET(
       return badRequestResponse('Document must be issued before viewing/printing')
     }
 
+    // Fetch project separately if project_id exists (no FK constraint in DB)
+    let project = null
+    if (document.project_id) {
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('id, name, code')
+        .eq('id', document.project_id)
+        .single()
+      project = projectData
+    }
+
   const company = document.company_snapshot || {}
   const customer = document.customer_snapshot || document.customer || {}
   const lines = document.lines || []
-  const project = document.project || null
   const isInvoice = document.document_type === 'invoice'
   const docTypeLabel = isInvoice ? 'Invoice' : 'Credit Note'
   const logoUrl = company.logo_url || null
+
+  // Calculate service vs expense totals for Skonto (Skonto only applies to services)
+  const serviceLines = lines.filter((line: any) => !line.expense_ids || line.expense_ids.length === 0)
+  const expenseLines = lines.filter((line: any) => line.expense_ids && line.expense_ids.length > 0)
+  const serviceTotal = serviceLines.reduce((sum: number, line: any) => sum + (line.total || 0), 0)
+  const expenseTotal = expenseLines.reduce((sum: number, line: any) => sum + (line.total || 0), 0)
 
   // Generate HTML
   const html = `
@@ -378,6 +394,7 @@ export async function GET(
       <h3>Payment Information</h3>
       <p><strong>Payment Terms:</strong> ${document.payment_terms_days} days</p>
       ${document.due_date ? `<p><strong>Please pay by:</strong> ${formatDate(document.due_date)}</p>` : ''}
+      ${document.skonto_percent && document.skonto_days && serviceTotal > 0 ? `<p><strong>Skonto:</strong> ${document.skonto_percent}% auf Dienstleistungen bei Zahlung innerhalb von ${document.skonto_days} Tagen (Zahlbar: ${formatCurrency(serviceTotal * (1 - document.skonto_percent / 100) + expenseTotal, document.currency)})</p>` : ''}
       ${document.payment_reference ? `<p><strong>Reference:</strong> ${document.payment_reference}</p>` : ''}
     </div>
 

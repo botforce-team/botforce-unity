@@ -54,6 +54,12 @@ export function CustomerForm({ customer }: CustomerFormProps) {
         default_tax_rate: formData.get('default_tax_rate') as string || 'standard_20',
         currency: (formData.get('currency') as string) || 'EUR',
         notes: (formData.get('notes') as string) || null,
+        skonto_percent: formData.get('skonto_percent')
+          ? parseFloat(formData.get('skonto_percent') as string)
+          : null,
+        skonto_days: formData.get('skonto_days')
+          ? parseInt(formData.get('skonto_days') as string)
+          : null,
       }
 
       const result = isEditing
@@ -245,6 +251,32 @@ export function CustomerForm({ customer }: CustomerFormProps) {
                 />
                 <span className="text-sm">Reverse Charge (EU B2B)</span>
               </label>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="skonto_percent">Skonto %</Label>
+                <Input
+                  id="skonto_percent"
+                  name="skonto_percent"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="100"
+                  defaultValue={customer?.skonto_percent ?? ''}
+                  placeholder="z.B. 2"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="skonto_days">Skonto Tage</Label>
+                <Input
+                  id="skonto_days"
+                  name="skonto_days"
+                  type="number"
+                  min="0"
+                  defaultValue={customer?.skonto_days ?? ''}
+                  placeholder="z.B. 10"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

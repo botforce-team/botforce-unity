@@ -10,6 +10,12 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies for company-assets bucket
+-- Drop existing policies if they exist, then recreate
+DROP POLICY IF EXISTS "Superadmins can upload company assets" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view company assets" ON storage.objects;
+DROP POLICY IF EXISTS "Superadmins can update company assets" ON storage.objects;
+DROP POLICY IF EXISTS "Superadmins can delete company assets" ON storage.objects;
+
 -- Only superadmins can upload company assets
 CREATE POLICY "Superadmins can upload company assets"
   ON storage.objects FOR INSERT

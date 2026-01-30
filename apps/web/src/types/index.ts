@@ -85,6 +85,8 @@ export interface Customer {
   currency: string
   notes: string | null
   is_active: boolean
+  skonto_percent: number | null
+  skonto_days: number | null
   created_at: string
   updated_at: string
 }
@@ -251,6 +253,8 @@ export interface Document {
   total: number
   tax_breakdown: TaxBreakdown | null
   currency: string
+  skonto_percent: number | null
+  skonto_days: number | null
   is_locked: boolean
   locked_at: string | null
   created_at: string
