@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, CreditCard, Ban, Trash2, Mail, Bell } from 'lucide-react'
+import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw } from 'lucide-react'
 import { Button, Input, Label } from '@/components/ui'
 import {
   issueDocument,
   markDocumentPaid,
   cancelDocument,
   deleteDocument,
+  refreshDocumentCompanySnapshot,
 } from '@/app/actions/documents'
 import { sendInvoiceEmail, sendPaymentReminder } from '@/app/actions/email'
 import type { Document } from '@/types'
@@ -88,14 +89,26 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
     })
   }
 
+  const handleRefreshCompanyInfo = () => {
+    startTransition(async () => {
+      const result = await refreshDocumentCompanySnapshot(document.id)
+      if (result.success) {
+        alert('Company info updated! The document now includes your current logo and bank details.')
+      } else {
+        alert(result.error || 'Failed to refresh company info')
+      }
+    })
+  }
+
   const canIssue = document.status === 'draft'
   const canMarkPaid = document.status === 'issued'
   const canCancel = document.status === 'draft' || document.status === 'issued'
   const canDelete = document.status === 'draft'
   const canSendEmail = ['issued', 'paid'].includes(document.status)
   const canSendReminder = document.status === 'issued' && document.document_type === 'invoice'
+  const canRefreshCompanyInfo = document.status !== 'cancelled'
 
-  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder) {
+  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo) {
     return null
   }
 
@@ -118,6 +131,12 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
           <Button variant="outline" onClick={handleSendReminder} disabled={isPending}>
             <Bell className="mr-2 h-4 w-4" />
             Send Reminder
+          </Button>
+        )}
+        {canRefreshCompanyInfo && (
+          <Button variant="outline" onClick={handleRefreshCompanyInfo} disabled={isPending}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Update Company Info
           </Button>
         )}
         {canMarkPaid && (

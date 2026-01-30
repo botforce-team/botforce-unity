@@ -473,6 +473,10 @@ export async function issueDocument(id: string): Promise<ActionResult<Document>>
     email: company.email,
     phone: company.phone,
     website: company.website,
+    logo_url: company.logo_url,
+    bank_name: company.bank_name,
+    bank_iban: company.bank_iban,
+    bank_bic: company.bank_bic,
   }
 
   const issueDate = new Date().toISOString().split('T')[0]
@@ -581,6 +585,77 @@ export async function cancelDocument(id: string): Promise<ActionResult<Document>
 
   if (error) {
     console.error('Error cancelling document:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/documents')
+  revalidatePath(`/documents/${id}`)
+  return { success: true, data: data as Document }
+}
+
+/**
+ * Refresh the company snapshot on an existing document
+ * This updates the document with the latest company information (logo, bank details, etc.)
+ */
+export async function refreshDocumentCompanySnapshot(id: string): Promise<ActionResult<Document>> {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+
+  // Get the document
+  const { data: document, error: docError } = await supabase
+    .from('documents')
+    .select('id, company_id, status')
+    .eq('id', id)
+    .single()
+
+  if (docError || !document) {
+    return { success: false, error: 'Document not found' }
+  }
+
+  // Get current company data
+  const { data: company, error: companyError } = await adminClient
+    .from('companies')
+    .select('*')
+    .eq('id', document.company_id)
+    .single()
+
+  if (companyError || !company) {
+    return { success: false, error: 'Company not found' }
+  }
+
+  // Create new company snapshot with all fields including logo and bank details
+  const companySnapshot: CompanySnapshot = {
+    name: company.name,
+    legal_name: company.legal_name,
+    vat_number: company.vat_number,
+    registration_number: company.registration_number,
+    address_line1: company.address_line1,
+    address_line2: company.address_line2,
+    postal_code: company.postal_code,
+    city: company.city,
+    country: company.country,
+    email: company.email,
+    phone: company.phone,
+    website: company.website,
+    logo_url: company.logo_url,
+    bank_name: company.bank_name,
+    bank_iban: company.bank_iban,
+    bank_bic: company.bank_bic,
+  }
+
+  // Update the document with the new snapshot
+  const { data, error } = await supabase
+    .from('documents')
+    .update({
+      company_snapshot: companySnapshot,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error refreshing company snapshot:', error)
     return { success: false, error: error.message }
   }
 
