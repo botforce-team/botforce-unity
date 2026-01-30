@@ -160,14 +160,14 @@ export async function GET(
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 30px;
+      margin-bottom: 16px;
     }
     th {
       background: #f3f4f6;
-      padding: 12px;
+      padding: 6px 8px;
       text-align: left;
       font-weight: 600;
-      font-size: 11px;
+      font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       border-bottom: 2px solid #e5e7eb;
@@ -176,9 +176,10 @@ export async function GET(
       text-align: right;
     }
     td {
-      padding: 12px;
+      padding: 5px 8px;
       border-bottom: 1px solid #e5e7eb;
       vertical-align: top;
+      font-size: 11px;
     }
     td.right {
       text-align: right;
@@ -191,18 +192,19 @@ export async function GET(
     }
     .totals {
       margin-left: auto;
-      width: 300px;
+      width: 280px;
     }
     .totals-row {
       display: flex;
       justify-content: space-between;
-      padding: 8px 0;
+      padding: 4px 0;
       border-bottom: 1px solid #e5e7eb;
+      font-size: 11px;
     }
     .totals-row.total {
       border-bottom: none;
-      padding-top: 12px;
-      font-size: 16px;
+      padding-top: 8px;
+      font-size: 14px;
       font-weight: 700;
     }
     .totals-row.total .amount {
