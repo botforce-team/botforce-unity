@@ -93,28 +93,24 @@ export async function GET(
     .header {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 40px;
+      margin-bottom: 20px;
     }
     .company-info {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 2px;
+      line-height: 1.3;
     }
     .company-logo {
-      max-height: 60px;
-      max-width: 200px;
+      max-height: 50px;
+      max-width: 180px;
       object-fit: contain;
-      margin-bottom: 8px;
-    }
-    .company-info h1 {
-      font-size: 24px;
-      font-weight: 600;
-      color: #2563eb;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     .company-info p {
       color: #666;
-      margin-bottom: 2px;
+      margin: 0;
+      font-size: 11px;
     }
     .document-info {
       text-align: right;
@@ -140,24 +136,26 @@ export async function GET(
     .addresses {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 40px;
-      padding: 20px;
+      margin-bottom: 24px;
+      padding: 12px 16px;
       background: #f9fafb;
-      border-radius: 8px;
+      border-radius: 6px;
     }
     .address-block h3 {
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #666;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
     .address-block p {
-      margin-bottom: 2px;
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.4;
     }
     .address-block .name {
       font-weight: 600;
-      font-size: 14px;
+      font-size: 12px;
     }
     table {
       width: 100%;
@@ -211,36 +209,38 @@ export async function GET(
       color: ${isInvoice ? '#2563eb' : '#dc2626'};
     }
     .payment-info {
-      margin-top: 40px;
-      padding: 20px;
+      margin-top: 20px;
+      padding: 12px 16px;
       background: #f9fafb;
-      border-radius: 8px;
+      border-radius: 6px;
     }
     .payment-info h3 {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      margin-bottom: 12px;
+      margin-bottom: 6px;
     }
     .payment-info p {
-      margin-bottom: 4px;
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.5;
     }
     .notes {
-      margin-top: 30px;
-      padding: 16px;
+      margin-top: 16px;
+      padding: 10px 14px;
       background: #fef3c7;
-      border-radius: 8px;
-      font-size: 11px;
+      border-radius: 6px;
+      font-size: 10px;
     }
     .notes h4 {
       font-weight: 600;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
     .footer {
-      margin-top: 60px;
-      padding-top: 20px;
+      margin-top: 30px;
+      padding-top: 12px;
       border-top: 1px solid #e5e7eb;
       text-align: center;
-      font-size: 10px;
+      font-size: 9px;
       color: #666;
     }
     .reverse-charge {
@@ -266,13 +266,9 @@ export async function GET(
   <div class="container">
     <div class="header">
       <div class="company-info">
-        ${logoUrl ? `<img src="${logoUrl}" alt="${company.name || 'Company'}" class="company-logo" />` : ''}
-        <h1>${company.name || 'Company Name'}</h1>
-        ${company.legal_name && company.legal_name !== company.name ? `<p>${company.legal_name}</p>` : ''}
+        ${logoUrl ? `<img src="${logoUrl}" alt="${company.name || 'Company'}" class="company-logo" />` : `<p style="font-weight: 600; font-size: 14px; color: #1a1a1a;">${company.name || 'Company Name'}</p>`}
         ${company.address_line1 ? `<p>${company.address_line1}</p>` : ''}
-        ${company.address_line2 ? `<p>${company.address_line2}</p>` : ''}
         ${company.postal_code || company.city ? `<p>${company.postal_code || ''} ${company.city || ''}</p>` : ''}
-        ${company.country ? `<p>${company.country}</p>` : ''}
         ${company.vat_number ? `<p>VAT: ${company.vat_number}</p>` : ''}
       </div>
       <div class="document-info">
@@ -370,18 +366,16 @@ export async function GET(
       <p><strong>Payment Terms:</strong> ${document.payment_terms_days} days</p>
       ${document.due_date ? `<p><strong>Please pay by:</strong> ${formatDate(document.due_date)}</p>` : ''}
       ${document.payment_reference ? `<p><strong>Reference:</strong> ${document.payment_reference}</p>` : ''}
-      ${company.bank_name || company.bank_iban ? `
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
-          <p style="font-weight: 600; margin-bottom: 4px;">Bank Details:</p>
-          ${company.bank_name ? `<p><strong>Bank:</strong> ${company.bank_name}</p>` : ''}
-          ${company.bank_iban ? `<p><strong>IBAN:</strong> ${company.bank_iban}</p>` : ''}
-          ${company.bank_bic ? `<p><strong>BIC:</strong> ${company.bank_bic}</p>` : ''}
-        </div>
-      ` : ''}
     </div>
 
     <div class="footer">
-      <p>Thank you for your business!</p>
+      ${company.bank_name || company.bank_iban ? `
+        <div style="margin-bottom: 8px;">
+          ${company.bank_name ? `<span><strong>Bank:</strong> ${company.bank_name}</span>` : ''}
+          ${company.bank_iban ? `<span style="margin-left: 16px;"><strong>IBAN:</strong> ${company.bank_iban}</span>` : ''}
+          ${company.bank_bic ? `<span style="margin-left: 16px;"><strong>BIC:</strong> ${company.bank_bic}</span>` : ''}
+        </div>
+      ` : ''}
       ${company.registration_number ? `<p>Company Registration: ${company.registration_number}</p>` : ''}
     </div>
   </div>
