@@ -731,6 +731,132 @@ export async function autoDetectDocumentProject(id: string): Promise<ActionResul
   return updateDocumentProject(id, uniqueProjectIds[0] as string)
 }
 
+/**
+ * Correct expense line tax rates on an issued document.
+ * Uses admin client to bypass RLS (document_lines RLS requires status='draft').
+ * This is for fixing VAT errors, e.g. expenses billed at 20% to a reverse charge customer.
+ */
+export async function correctExpenseTaxRates(
+  documentId: string,
+  newTaxRate: TaxRate
+): Promise<ActionResult<Document>> {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+
+  // Verify user is authenticated and has access
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Verify document exists and belongs to user's company
+  const { data: document } = await supabase
+    .from('documents')
+    .select('id, company_id, status, is_locked')
+    .eq('id', documentId)
+    .single()
+
+  if (!document) {
+    return { success: false, error: 'Document not found' }
+  }
+
+  if (document.is_locked) {
+    return { success: false, error: 'Document is locked and cannot be corrected' }
+  }
+
+  // Get all lines for this document
+  const { data: lines, error: linesError } = await adminClient
+    .from('document_lines')
+    .select('*')
+    .eq('document_id', documentId)
+
+  if (linesError || !lines) {
+    return { success: false, error: 'Failed to fetch document lines' }
+  }
+
+  // Find expense lines (lines with expense_ids)
+  const expenseLines = lines.filter(
+    (line: DocumentLine) => line.expense_ids && line.expense_ids.length > 0
+  )
+
+  if (expenseLines.length === 0) {
+    return { success: false, error: 'No expense lines found on this document' }
+  }
+
+  // Update each expense line's tax rate using admin client
+  for (const line of expenseLines) {
+    const lineTax = calculateTax(line.subtotal, newTaxRate)
+    const { error: updateError } = await adminClient
+      .from('document_lines')
+      .update({
+        tax_rate: newTaxRate,
+        tax_amount: lineTax,
+        total: line.subtotal + lineTax,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', line.id)
+
+    if (updateError) {
+      console.error('Error updating line:', updateError)
+      return { success: false, error: `Failed to update line: ${line.description}` }
+    }
+  }
+
+  // Recalculate document totals from all lines
+  const { data: updatedLines } = await adminClient
+    .from('document_lines')
+    .select('*')
+    .eq('document_id', documentId)
+
+  if (!updatedLines) {
+    return { success: false, error: 'Failed to fetch updated lines' }
+  }
+
+  let subtotal = 0
+  let totalTax = 0
+  const taxBreakdown: TaxBreakdown = {}
+
+  for (const line of updatedLines) {
+    subtotal += Number(line.subtotal)
+    totalTax += Number(line.tax_amount)
+
+    const rate = line.tax_rate as TaxRate
+    if (rate in taxBreakdown) {
+      taxBreakdown[rate] = (taxBreakdown[rate] || 0) + Number(line.tax_amount)
+    } else {
+      taxBreakdown[rate] = Number(line.tax_amount)
+    }
+  }
+
+  const total = subtotal + totalTax
+
+  // Update document totals using admin client (bypasses RLS)
+  const { data: updatedDoc, error: docError } = await adminClient
+    .from('documents')
+    .update({
+      subtotal,
+      tax_amount: totalTax,
+      total,
+      tax_breakdown: taxBreakdown,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', documentId)
+    .select()
+    .single()
+
+  if (docError) {
+    console.error('Error updating document totals:', docError)
+    return { success: false, error: docError.message }
+  }
+
+  revalidatePath('/documents')
+  revalidatePath(`/documents/${documentId}`)
+  return { success: true, data: updatedDoc as Document }
+}
+
 // Helper to get customers for select
 export async function getCustomersForDocumentSelect(): Promise<{ value: string; label: string }[]> {
   const supabase = await createClient()

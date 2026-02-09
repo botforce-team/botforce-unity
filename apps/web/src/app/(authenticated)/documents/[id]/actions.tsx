@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw, Link2 } from 'lucide-react'
+import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw, Link2, Wrench } from 'lucide-react'
 import { Button, Input, Label } from '@/components/ui'
 import {
   issueDocument,
@@ -11,9 +11,11 @@ import {
   deleteDocument,
   refreshDocumentCompanySnapshot,
   autoDetectDocumentProject,
+  correctExpenseTaxRates,
 } from '@/app/actions/documents'
 import { sendInvoiceEmail, sendPaymentReminder } from '@/app/actions/email'
-import type { Document } from '@/types'
+import type { Document, TaxRate } from '@/types'
+import { taxRateOptions } from '@/lib/constants'
 
 interface DocumentStatusActionsProps {
   document: Document
@@ -25,6 +27,8 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showFixTaxModal, setShowFixTaxModal] = useState(false)
+  const [fixTaxRate, setFixTaxRate] = useState<TaxRate>('reverse_charge')
   const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0])
   const [paymentReference, setPaymentReference] = useState('')
 
@@ -112,6 +116,18 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
     })
   }
 
+  const handleFixExpenseTaxRates = () => {
+    startTransition(async () => {
+      const result = await correctExpenseTaxRates(document.id, fixTaxRate)
+      if (result.success) {
+        alert('Expense tax rates corrected and totals recalculated.')
+      } else {
+        alert(result.error || 'Failed to correct tax rates')
+      }
+      setShowFixTaxModal(false)
+    })
+  }
+
   const canIssue = document.status === 'draft'
   const canMarkPaid = document.status === 'issued'
   const canCancel = document.status === 'draft' || document.status === 'issued'
@@ -120,8 +136,9 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
   const canSendReminder = document.status === 'issued' && document.document_type === 'invoice'
   const canRefreshCompanyInfo = document.status !== 'cancelled'
   const canLinkProject = !document.project_id && document.status !== 'cancelled'
+  const canFixTaxRates = ['issued', 'draft'].includes(document.status) && !document.is_locked
 
-  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo && !canLinkProject) {
+  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo && !canLinkProject && !canFixTaxRates) {
     return null
   }
 
@@ -156,6 +173,12 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
           <Button variant="outline" onClick={handleLinkProject} disabled={isPending}>
             <Link2 className="mr-2 h-4 w-4" />
             Link Project
+          </Button>
+        )}
+        {canFixTaxRates && (
+          <Button variant="outline" onClick={() => setShowFixTaxModal(true)} disabled={isPending}>
+            <Wrench className="mr-2 h-4 w-4" />
+            Fix Expense VAT
           </Button>
         )}
         {canMarkPaid && (
@@ -255,6 +278,44 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
               <Button variant="danger" onClick={handleDelete} disabled={isPending}>
                 {isPending ? 'Deleting...' : 'Delete'}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fix Expense Tax Rate Modal */}
+      {showFixTaxModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowFixTaxModal(false)} />
+          <div className="relative z-10 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-xl">
+            <h3 className="text-lg font-medium text-text-primary mb-2">Fix Expense Tax Rates</h3>
+            <p className="text-sm text-text-secondary mb-4">
+              This will update the tax rate on all expense lines and recalculate the document totals.
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fix_tax_rate">New Tax Rate for Expenses</Label>
+                <select
+                  id="fix_tax_rate"
+                  className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm"
+                  value={fixTaxRate}
+                  onChange={(e) => setFixTaxRate(e.target.value as TaxRate)}
+                >
+                  {taxRateOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setShowFixTaxModal(false)} disabled={isPending}>
+                  Cancel
+                </Button>
+                <Button onClick={handleFixExpenseTaxRates} disabled={isPending}>
+                  {isPending ? 'Correcting...' : 'Correct Tax Rates'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
