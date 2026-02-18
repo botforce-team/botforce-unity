@@ -73,8 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_team_invites_company ON team_invites(company_id);
 CREATE INDEX IF NOT EXISTS idx_team_invites_email ON team_invites(email);
 CREATE INDEX IF NOT EXISTS idx_team_invites_expires ON team_invites(expires_at) WHERE accepted_at IS NULL;
 
--- RLS for team_invites (disabled for now to avoid recursion issues)
--- ALTER TABLE team_invites ENABLE ROW LEVEL SECURITY;
+-- RLS for team_invites is enabled in 20260218210001_team_invites_rls.sql
 
 -- ============================================================================
 -- RECEIPTS STORAGE BUCKET
