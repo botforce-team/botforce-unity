@@ -259,6 +259,9 @@ export async function getCashForecast(weeks: number = 12): Promise<CashForecastW
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  const forecastEnd = new Date(today)
+  forecastEnd.setDate(forecastEnd.getDate() + weeks * 7)
+
   // Get current outstanding invoices (expected income)
   const { data: outstandingInvoices } = await supabase
     .from('documents')
@@ -285,21 +288,56 @@ export async function getCashForecast(weeks: number = 12): Promise<CashForecastW
   const totalRecentExpenses = recentExpenses?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0
   const avgWeeklyExpenses = totalRecentExpenses / 8
 
+  // Starting balance: use Revolut bank balance if available, otherwise 0
+  let cumulativeBalance = 0
+  const { data: revolutAccounts } = await supabase
+    .from('revolut_accounts')
+    .select('balance, currency')
+    .eq('state', 'active')
+
+  if (revolutAccounts && revolutAccounts.length > 0) {
+    // Sum EUR balances (primary currency)
+    cumulativeBalance = revolutAccounts
+      .filter((a: any) => a.currency === 'EUR')
+      .reduce((sum: number, a: any) => sum + (a.balance || 0), 0)
+  }
+
+  // Pre-compute recurring invoice expected payment dates within the forecast window
+  const recurringPayments: { expectedPayDate: Date; total: number }[] = []
+  const frequencyDays: Record<string, number> = {
+    weekly: 7,
+    biweekly: 14,
+    monthly: 30,
+    quarterly: 91,
+    yearly: 365,
+  }
+
+  recurringTemplates?.forEach((template: any) => {
+    if (!template.next_issue_date) return
+    const paymentDays = template.payment_terms_days || 14
+    const intervalDays = frequencyDays[template.frequency] || 30
+
+    // Project all occurrences within the forecast window
+    let issueDate = new Date(template.next_issue_date)
+    while (true) {
+      const expectedPayDate = new Date(issueDate)
+      expectedPayDate.setDate(expectedPayDate.getDate() + paymentDays)
+
+      // Stop if the issue date itself is past the forecast window
+      if (issueDate > forecastEnd) break
+
+      if (expectedPayDate >= today && expectedPayDate <= forecastEnd) {
+        recurringPayments.push({ expectedPayDate, total: template.total || 0 })
+      }
+
+      // Advance to next occurrence
+      issueDate = new Date(issueDate)
+      issueDate.setDate(issueDate.getDate() + intervalDays)
+    }
+  })
+
   // Generate weekly forecast
   const forecast: CashForecastWeek[] = []
-  let cumulativeBalance = 0
-
-  // Get starting balance (current cash position)
-  // For simplicity, we'll start from outstanding invoices minus pending expenses
-  const { data: pendingExpenses } = await supabase
-    .from('expenses')
-    .select('amount')
-    .in('status', ['submitted', 'approved'])
-    .is('reimbursed_at', null)
-    .eq('is_reimbursable', true)
-
-  const pendingExpenseTotal = pendingExpenses?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0
-  cumulativeBalance = -pendingExpenseTotal // Start with pending obligations
 
   for (let i = 0; i < weeks; i++) {
     const weekStart = new Date(today)
@@ -311,26 +349,30 @@ export async function getCashForecast(weeks: number = 12): Promise<CashForecastW
     let expectedIncome = 0
 
     // Add outstanding invoices due this week
+    // Overdue invoices (due_date < today) or invoices without due_date go into week 1
     outstandingInvoices?.forEach((inv) => {
       if (inv.due_date) {
         const dueDate = new Date(inv.due_date)
-        if (dueDate >= weekStart && dueDate <= weekEnd) {
+        if (dueDate < today) {
+          // Overdue: expect payment in week 1
+          if (i === 0) {
+            expectedIncome += inv.total || 0
+          }
+        } else if (dueDate >= weekStart && dueDate <= weekEnd) {
+          expectedIncome += inv.total || 0
+        }
+      } else {
+        // No due date: include in week 1
+        if (i === 0) {
           expectedIncome += inv.total || 0
         }
       }
     })
 
-    // Add recurring invoices expected to be issued and paid
-    recurringTemplates?.forEach((template: any) => {
-      if (template.next_issue_date) {
-        const issueDate = new Date(template.next_issue_date)
-        const paymentDays = template.payment_terms_days || 14
-        const expectedPayDate = new Date(issueDate)
-        expectedPayDate.setDate(expectedPayDate.getDate() + paymentDays)
-
-        if (expectedPayDate >= weekStart && expectedPayDate <= weekEnd) {
-          expectedIncome += template.total || 0
-        }
+    // Add recurring invoice payments expected this week
+    recurringPayments.forEach((payment) => {
+      if (payment.expectedPayDate >= weekStart && payment.expectedPayDate <= weekEnd) {
+        expectedIncome += payment.total
       }
     })
 
