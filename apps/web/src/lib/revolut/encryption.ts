@@ -91,8 +91,11 @@ export function generateClientAssertion(): string {
 
   const header = { alg: 'RS256', typ: 'JWT' }
   const now = Math.floor(Date.now() / 1000)
+  const redirectUri = process.env.REVOLUT_REDIRECT_URI ||
+    `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/revolut/callback`
+  const domain = new URL(redirectUri).hostname
   const payload = {
-    iss: clientId,
+    iss: domain,
     sub: clientId,
     aud: 'https://revolut.com',
     iat: now,
