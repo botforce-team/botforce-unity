@@ -113,9 +113,14 @@ export async function GET(
 <meta charset="UTF-8">
 <title>${exportData.name}</title>
 <style>
-  @page { size: A4; margin: 15mm; }
+  @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 9pt; color: #333; line-height: 1.4; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 9pt; color: #333; line-height: 1.4; background: #e5e7eb; }
+  .page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 15mm; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  @media print {
+    body { background: white; }
+    .page { width: auto; min-height: auto; margin: 0; padding: 15mm; box-shadow: none; }
+  }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #1a1a1a; }
   .company-info { font-size: 8pt; color: #666; }
   .company-info p { margin: 1px 0; }
@@ -146,6 +151,7 @@ export async function GET(
 </style>
 </head>
 <body>
+<div class="page">
   <!-- Header -->
   <div class="header">
     <div>
@@ -243,9 +249,16 @@ export async function GET(
     <tr class="total-row"><td colspan="3">Total Expenses</td><td class="right">${formatCurrency(totalExpenses)}</td><td class="right">${formatCurrency(totalTaxExpenses)}</td></tr>
   </table>` : '<p style="color: #999; font-size: 8pt;">No expenses in this period.</p>'}
 
+  <!-- Footer -->
+  <div class="footer">
+    <span>${company.name || ''} – ${exportData.name}</span>
+    <span>${period}</span>
+  </div>
+</div><!-- end page 1 -->
+
   <!-- Bank Transactions -->
   ${(bankTransactions && bankTransactions.length > 0) ? `
-  <div class="page-break"></div>
+<div class="page">
   <div class="header">
     <div>
       ${logoUrl ? `<img src="${logoUrl}" alt="${company.name}" class="company-logo" />` : `<div class="company-name">${company.name || ''}</div>`}
@@ -286,13 +299,13 @@ export async function GET(
       <td colspan="4">Net Total</td>
       <td class="right ${bankIncome - bankOutflow >= 0 ? 'positive' : 'negative'}">${formatCurrency(bankIncome - bankOutflow)}</td>
     </tr>
-  </table>` : ''}
+  </table>
 
-  <!-- Footer -->
   <div class="footer">
-    <span>${company.name || ''} – ${exportData.name}</span>
+    <span>${company.name || ''} – ${exportData.name} – Bank Transactions</span>
     <span>${period}</span>
   </div>
+</div><!-- end bank page -->` : ''}
 </body>
 </html>`
 
