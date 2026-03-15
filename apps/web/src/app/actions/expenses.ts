@@ -443,21 +443,25 @@ export async function uploadReceipt(
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const filename = `${membership.company_id}/${expenseId}/${Date.now()}.${ext}`
 
-  // Upload to Supabase Storage
-  const { error: uploadError } = await supabase.storage
+  // Convert File to ArrayBuffer for server-side upload
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+
+  // Upload to Supabase Storage using admin client (bypasses RLS)
+  const { error: uploadError } = await adminClient.storage
     .from('receipts')
-    .upload(filename, file, {
+    .upload(filename, buffer, {
       contentType: file.type,
-      upsert: false,
+      upsert: true,
     })
 
   if (uploadError) {
     console.error('Error uploading receipt:', uploadError)
-    return { success: false, error: 'Failed to upload file' }
+    return { success: false, error: `Failed to upload file: ${uploadError.message}` }
   }
 
-  // Create file record
-  const { data: fileRecord, error: recordError } = await supabase
+  // Create file record using admin client
+  const { data: fileRecord, error: recordError } = await adminClient
     .from('files')
     .insert({
       company_id: membership.company_id,
@@ -474,13 +478,12 @@ export async function uploadReceipt(
 
   if (recordError) {
     console.error('Error creating file record:', recordError)
-    // Try to delete the uploaded file
-    await supabase.storage.from('receipts').remove([filename])
+    await adminClient.storage.from('receipts').remove([filename])
     return { success: false, error: 'Failed to create file record' }
   }
 
   // Update expense with file reference
-  const { error: updateError } = await supabase
+  const { error: updateError } = await adminClient
     .from('expenses')
     .update({
       receipt_file_id: fileRecord.id,
@@ -493,7 +496,7 @@ export async function uploadReceipt(
   }
 
   // Get signed URL
-  const { data: urlData } = await supabase.storage
+  const { data: urlData } = await adminClient.storage
     .from('receipts')
     .createSignedUrl(filename, 3600)
 
