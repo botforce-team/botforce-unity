@@ -182,8 +182,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(financeUrl)
 
   } catch (err) {
-    console.error('Revolut OAuth callback error:', err)
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('Revolut OAuth callback error:', message, err)
     baseRedirectUrl.searchParams.set('error', 'callback_failed')
+    baseRedirectUrl.searchParams.set('message', message)
     return NextResponse.redirect(baseRedirectUrl)
   }
 }

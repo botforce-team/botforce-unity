@@ -70,7 +70,7 @@ export default async function SettingsPage({
           {params.error === 'oauth_denied' && `Connection was denied: ${params.message || 'Unknown error'}`}
           {params.error === 'state_mismatch' && 'Security validation failed. Please try again.'}
           {params.error === 'session_expired' && 'Session expired. Please try connecting again.'}
-          {params.error === 'callback_failed' && 'Connection failed. Please try again.'}
+          {params.error === 'callback_failed' && `Connection failed: ${params.message || 'Unknown error'}`}
           {!['already_connected', 'oauth_denied', 'state_mismatch', 'session_expired', 'callback_failed'].includes(params.error) && params.error}
         </div>
       )}
