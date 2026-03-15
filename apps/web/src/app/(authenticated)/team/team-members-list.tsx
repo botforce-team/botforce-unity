@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { UserPlus, MoreVertical, UserMinus, UserCheck, Mail } from 'lucide-react'
 import { Button, Badge, Input, Label, Select } from '@/components/ui'
@@ -46,8 +47,27 @@ export function TeamMembersList({ members, currentUserId, isSuperadmin }: TeamMe
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [editingMember, setEditingMember] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const router = useRouter()
   const { toast } = useToast()
+
+  const updatePosition = useCallback((memberId: string) => {
+    const btn = buttonRefs.current[memberId]
+    if (btn) {
+      const rect = btn.getBoundingClientRect()
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: rect.right - 192,
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (menuOpen) {
+      updatePosition(menuOpen)
+    }
+  }, [menuOpen, updatePosition])
 
   // Invite form state
   const [email, setEmail] = useState('')
@@ -323,32 +343,41 @@ export function TeamMembersList({ members, currentUserId, isSuperadmin }: TeamMe
                   {isSuperadmin && !isCurrentUser && (
                     <div className="relative">
                       <Button
+                        ref={(el) => { buttonRefs.current[member.id] = el }}
                         variant="ghost"
                         size="sm"
                         onClick={() => setMenuOpen(menuOpen === member.id ? null : member.id)}
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
-                      {menuOpen === member.id && (
-                        <div className="absolute right-0 bottom-full z-10 mb-1 w-48 rounded-md border border-border bg-background py-1 shadow-lg max-h-80 overflow-y-auto">
-                          <button
-                            onClick={() => {
-                              setEditingMember(member.id)
-                              setMenuOpen(null)
-                            }}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-surface"
-                          >
-                            Change Role
-                          </button>
-                          <button
-                            onClick={() => handleDeactivate(member.id, name)}
-                            disabled={isLoading === member.id}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-surface"
-                          >
-                            <UserMinus className="h-4 w-4" />
-                            Deactivate
-                          </button>
-                        </div>
+                      {menuOpen === member.id && menuPos && createPortal(
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setMenuOpen(null)}
+                          />
+                          <div className="fixed z-50 w-48 rounded-md border border-border bg-background py-1 shadow-lg max-h-80 overflow-y-auto"
+                            style={{ top: menuPos.top, left: menuPos.left }}>
+                            <button
+                              onClick={() => {
+                                setEditingMember(member.id)
+                                setMenuOpen(null)
+                              }}
+                              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-surface"
+                            >
+                              Change Role
+                            </button>
+                            <button
+                              onClick={() => handleDeactivate(member.id, name)}
+                              disabled={isLoading === member.id}
+                              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-surface"
+                            >
+                              <UserMinus className="h-4 w-4" />
+                              Deactivate
+                            </button>
+                          </div>
+                        </>,
+                        globalThis.document.body
                       )}
                     </div>
                   )}

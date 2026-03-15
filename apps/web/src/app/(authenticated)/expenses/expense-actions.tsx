@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { MoreHorizontal, Pencil, Trash2, Send, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui'
@@ -23,6 +24,24 @@ export function ExpenseActions({ expense, isAdmin }: ExpenseActionsProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+
+  const updatePosition = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: rect.right - 224,
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition()
+    }
+  }, [isOpen, updatePosition])
 
   const handleSubmit = () => {
     startTransition(async () => {
@@ -78,6 +97,7 @@ export function ExpenseActions({ expense, isAdmin }: ExpenseActionsProps) {
   return (
     <div className="relative">
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
@@ -86,7 +106,7 @@ export function ExpenseActions({ expense, isAdmin }: ExpenseActionsProps) {
         <MoreHorizontal className="h-4 w-4" />
       </Button>
 
-      {isOpen && (
+      {isOpen && menuPos && createPortal(
         <>
           <div
             className="fixed inset-0 z-40"
@@ -96,7 +116,8 @@ export function ExpenseActions({ expense, isAdmin }: ExpenseActionsProps) {
               setShowRejectForm(false)
             }}
           />
-          <div className="absolute right-0 bottom-full z-50 mb-1 w-56 rounded-md border border-border bg-surface shadow-lg max-h-80 overflow-y-auto">
+          <div className="fixed z-50 w-56 rounded-md border border-border bg-surface shadow-lg max-h-80 overflow-y-auto"
+            style={{ top: menuPos.top, left: menuPos.left }}>
             {showDeleteConfirm ? (
               <div className="p-3">
                 <p className="text-sm text-text-primary mb-3">Delete this expense?</p>
@@ -209,7 +230,8 @@ export function ExpenseActions({ expense, isAdmin }: ExpenseActionsProps) {
               </div>
             )}
           </div>
-        </>
+        </>,
+        globalThis.document.body
       )}
     </div>
   )

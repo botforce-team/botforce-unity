@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { MoreHorizontal, Play, Pause, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import {
@@ -17,6 +18,24 @@ export function RecurringActions({ template }: RecurringActionsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+
+  const updatePosition = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: rect.right - 192,
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition()
+    }
+  }, [isOpen, updatePosition])
 
   const handleToggleActive = () => {
     startTransition(async () => {
@@ -42,6 +61,7 @@ export function RecurringActions({ template }: RecurringActionsProps) {
   return (
     <div className="relative">
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
@@ -50,7 +70,7 @@ export function RecurringActions({ template }: RecurringActionsProps) {
         <MoreHorizontal className="h-4 w-4" />
       </Button>
 
-      {isOpen && (
+      {isOpen && menuPos && createPortal(
         <>
           <div
             className="fixed inset-0 z-40"
@@ -59,7 +79,8 @@ export function RecurringActions({ template }: RecurringActionsProps) {
               setShowDeleteConfirm(false)
             }}
           />
-          <div className="absolute right-0 bottom-full z-50 mb-1 w-48 rounded-md border border-border bg-surface shadow-lg max-h-80 overflow-y-auto">
+          <div className="fixed z-50 w-48 rounded-md border border-border bg-surface shadow-lg max-h-80 overflow-y-auto"
+            style={{ top: menuPos.top, left: menuPos.left }}>
             {showDeleteConfirm ? (
               <div className="p-3">
                 <p className="text-sm text-text-primary mb-3">Delete this template?</p>
@@ -112,7 +133,8 @@ export function RecurringActions({ template }: RecurringActionsProps) {
               </div>
             )}
           </div>
-        </>
+        </>,
+        globalThis.document.body
       )}
     </div>
   )
