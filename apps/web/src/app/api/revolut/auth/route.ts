@@ -10,6 +10,8 @@ import { generateAuthUrl, generateOAuthState } from '@/lib/revolut'
 import { unauthorizedResponse, forbiddenResponse, errorResponse } from '@/lib/api-utils'
 import { env } from '@/lib/env'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Check if Revolut is configured

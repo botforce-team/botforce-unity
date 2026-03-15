@@ -58,30 +58,32 @@ export function CashFlowChart({ data }: CashFlowChartProps) {
           <svg
             className="absolute inset-0 pointer-events-none"
             style={{ top: '24px', bottom: '32px', height: 'calc(100% - 56px)' }}
+            viewBox="0 0 1000 1000"
+            preserveAspectRatio="none"
           >
             <polyline
               fill="none"
               stroke="#2563eb"
-              strokeWidth="2"
+              strokeWidth="8"
               points={data.map((item, index) => {
-                const x = (index / (data.length - 1)) * 100
-                const y = 100 - ((item.cumulativeBalance - minBalance) / range) * 100
-                return `${x}%,${y}%`
+                const x = (index / (data.length - 1)) * 1000
+                const y = 1000 - ((item.cumulativeBalance - minBalance) / range) * 1000
+                return `${x},${y}`
               }).join(' ')}
             />
             {/* Points */}
             {data.map((item, index) => {
-              const x = (index / (data.length - 1)) * 100
-              const y = 100 - ((item.cumulativeBalance - minBalance) / range) * 100
+              const x = (index / (data.length - 1)) * 1000
+              const y = 1000 - ((item.cumulativeBalance - minBalance) / range) * 1000
               return (
                 <circle
                   key={index}
-                  cx={`${x}%`}
-                  cy={`${y}%`}
-                  r="4"
+                  cx={x}
+                  cy={y}
+                  r="16"
                   fill={item.cumulativeBalance >= 0 ? '#10b981' : '#ef4444'}
                   stroke="white"
-                  strokeWidth="1"
+                  strokeWidth="4"
                 />
               )
             })}
