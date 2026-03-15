@@ -80,6 +80,14 @@ export function ExportForm() {
   }
 
   // Quick period selectors
+  const setMonthPeriod = (month: number, year: number) => {
+    const start = new Date(year, month, 1)
+    const end = new Date(year, month + 1, 0)
+    setPeriodStart(start.toISOString().split('T')[0])
+    setPeriodEnd(end.toISOString().split('T')[0])
+    setName(`Export ${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`)
+  }
+
   const setQuarterPeriod = (quarter: number, year: number) => {
     const startMonth = (quarter - 1) * 3
     const start = new Date(year, startMonth, 1)
@@ -96,7 +104,19 @@ export function ExportForm() {
   }
 
   const currentYear = today.getFullYear()
-  const currentQuarter = Math.floor(today.getMonth() / 3) + 1
+  const currentMonth = today.getMonth()
+  const currentQuarter = Math.floor(currentMonth / 3) + 1
+
+  // Generate last 12 months for monthly selector
+  const monthOptions: { month: number; year: number; label: string }[] = []
+  for (let i = 1; i <= 12; i++) {
+    const d = new Date(currentYear, currentMonth - i, 1)
+    monthOptions.push({
+      month: d.getMonth(),
+      year: d.getFullYear(),
+      label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+    })
+  }
 
   return (
     <form onSubmit={handleSubmit}>
@@ -135,49 +155,72 @@ export function ExportForm() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Quick selectors */}
-            <div className="space-y-2">
-              <Label>Quick Select</Label>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-                    const lastDay = new Date(today.getFullYear(), today.getMonth(), 0)
-                    setPeriodStart(lastMonth.toISOString().split('T')[0])
-                    setPeriodEnd(lastDay.toISOString().split('T')[0])
-                    setName(`Export ${lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`)
-                  }}
-                >
-                  Last Month
-                </Button>
-                {currentQuarter > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setQuarterPeriod(currentQuarter - 1, currentYear)}
-                  >
-                    Q{currentQuarter - 1} {currentYear}
+            <div className="space-y-3">
+              {/* Monthly */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-muted uppercase tracking-wide">Monthly</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {monthOptions.slice(0, 6).map((opt) => (
+                    <Button
+                      key={`${opt.year}-${opt.month}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMonthPeriod(opt.month, opt.year)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {monthOptions.slice(6).map((opt) => (
+                    <Button
+                      key={`${opt.year}-${opt.month}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMonthPeriod(opt.month, opt.year)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quarterly */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-muted uppercase tracking-wide">Quarterly</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[1, 2, 3, 4].map((q) => {
+                    // Show quarters from current year and previous year
+                    const isCurrentYear = q < currentQuarter
+                    const year = isCurrentYear ? currentYear : currentYear - 1
+                    return (
+                      <Button
+                        key={`q${q}-${year}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQuarterPeriod(q, year)}
+                      >
+                        Q{q} {year}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Yearly */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-muted uppercase tracking-wide">Full Year</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setYearPeriod(currentYear)}>
+                    {currentYear}
                   </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setQuarterPeriod(4, currentYear - 1)}
-                >
-                  Q4 {currentYear - 1}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setYearPeriod(currentYear - 1)}
-                >
-                  Full Year {currentYear - 1}
-                </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setYearPeriod(currentYear - 1)}>
+                    {currentYear - 1}
+                  </Button>
+                </div>
               </div>
             </div>
 

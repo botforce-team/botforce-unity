@@ -124,13 +124,13 @@ export function RevolutBalanceCard({ accounts, balances, isConnected }: RevolutB
           </div>
         )}
 
-        {/* Link to full view */}
+        {/* Link to settings for managing connection */}
         <div className="pt-2">
           <Link
-            href="/finance"
-            className="text-sm text-primary hover:underline"
+            href="/settings?tab=integrations"
+            className="text-sm text-text-muted hover:text-primary hover:underline"
           >
-            View details →
+            Manage connection →
           </Link>
         </div>
       </CardContent>

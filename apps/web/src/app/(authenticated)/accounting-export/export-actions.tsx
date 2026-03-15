@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { MoreHorizontal, Download, Trash2, Archive, FileText } from 'lucide-react'
+import { MoreHorizontal, Download, Trash2, Archive, FileText, Printer } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { deleteAccountingExport, generateExportCSV, generateExportZip, getReceiptSignedUrls } from '@/app/actions/accounting-export'
 import type { AccountingExport } from '@/types'
@@ -173,6 +173,16 @@ export function ExportActions({ export: exp }: ExportActionsProps) {
               <div className="py-1">
                 {exp.status === 'completed' && (
                   <>
+                    <a
+                      href={`/api/accounting-export/${exp.id}/pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-hover"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <Printer className="h-4 w-4" />
+                      View / Print Report (A4)
+                    </a>
                     <button
                       onClick={handleDownloadCSV}
                       disabled={isPending || !!downloadProgress}
