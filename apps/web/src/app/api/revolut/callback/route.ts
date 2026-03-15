@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { exchangeCodeForTokens, RevolutClient, parseAccount, parseTransaction } from '@/lib/revolut'
-import { encrypt } from '@/lib/revolut/encryption'
+import { encrypt, generateClientAssertion } from '@/lib/revolut/encryption'
 import { errorResponse } from '@/lib/api-utils'
 
 export const dynamic = 'force-dynamic'
@@ -188,25 +188,3 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * Generate JWT client assertion for Revolut API
- * In production, this should be a proper JWT signed with your private key
- * For sandbox testing, Revolut accepts a simpler format
- */
-function generateClientAssertion(): string {
-  // For sandbox/development, we can use a simple assertion
-  // In production, implement proper JWT signing with your certificate
-  const clientId = process.env.REVOLUT_CLIENT_ID || ''
-
-  // This is a simplified version for sandbox
-  // Production requires RS256-signed JWT with:
-  // - iss: client_id
-  // - sub: client_id
-  // - aud: https://revolut.com
-  // - exp: current time + 2 minutes
-  // - jti: unique identifier
-
-  // For now, return the client_id as placeholder
-  // You'll need to implement proper JWT signing for production
-  return clientId
-}

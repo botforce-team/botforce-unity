@@ -12,7 +12,7 @@ import {
   successResponse,
 } from '@/lib/api-utils'
 import { RevolutClient, parseAccount, parseTransaction, refreshAccessToken } from '@/lib/revolut'
-import { decrypt, encrypt } from '@/lib/revolut/encryption'
+import { decrypt, encrypt, generateClientAssertion } from '@/lib/revolut/encryption'
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,10 +77,10 @@ export async function POST(request: NextRequest) {
       const now = new Date()
       if (expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
         const refreshToken = decrypt(connection.refresh_token_encrypted)
-        const clientId = process.env.REVOLUT_CLIENT_ID || ''
+        const clientAssertion = generateClientAssertion()
 
         try {
-          const tokens = await refreshAccessToken(refreshToken, clientId)
+          const tokens = await refreshAccessToken(refreshToken, clientAssertion)
           accessToken = tokens.access_token
 
           // Store new encrypted tokens

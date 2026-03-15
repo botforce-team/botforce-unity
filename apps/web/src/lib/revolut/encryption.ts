@@ -6,7 +6,7 @@
  * for tokens at rest. This module handles encryption for transit.
  */
 
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto'
+import { createCipheriv, createDecipheriv, createSign, randomBytes, createHash } from 'crypto'
 
 const ALGORITHM = 'aes-256-cbc'
 const IV_LENGTH = 16
@@ -74,4 +74,43 @@ export function generateOAuthState(): string {
  */
 export function generateRequestId(): string {
   return randomBytes(16).toString('hex')
+}
+
+/**
+ * Generate JWT client assertion for Revolut API
+ * Production: RS256-signed JWT using REVOLUT_PRIVATE_KEY
+ * Sandbox: returns client_id as-is
+ */
+export function generateClientAssertion(): string {
+  const clientId = process.env.REVOLUT_CLIENT_ID || ''
+  const privateKeyPem = process.env.REVOLUT_PRIVATE_KEY
+
+  if (!privateKeyPem) {
+    return clientId
+  }
+
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const now = Math.floor(Date.now() / 1000)
+  const payload = {
+    iss: clientId,
+    sub: clientId,
+    aud: 'https://revolut.com',
+    iat: now,
+    exp: now + 120,
+    jti: randomBytes(16).toString('hex'),
+  }
+
+  const encode = (obj: object) =>
+    Buffer.from(JSON.stringify(obj)).toString('base64url')
+
+  const headerB64 = encode(header)
+  const payloadB64 = encode(payload)
+  const signingInput = `${headerB64}.${payloadB64}`
+
+  const key = privateKeyPem.replace(/\\n/g, '\n')
+  const sign = createSign('RSA-SHA256')
+  sign.update(signingInput)
+  const signature = sign.sign(key, 'base64url')
+
+  return `${signingInput}.${signature}`
 }
