@@ -16,6 +16,7 @@ export interface FinanceOverview {
 export interface MonthlyData {
   month: string
   revenue: number
+  outstanding: number
   expenses: number
 }
 
@@ -108,42 +109,62 @@ export async function getMonthlyRevenue(months: number = 12): Promise<MonthlyDat
 
   const today = new Date()
   const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1)
+  const startDateStr = startDate.toISOString().split('T')[0]
 
-  // Get all paid invoices in the period
-  const { data: invoices } = await supabase
+  // Get paid invoices - use paid_date, fall back to issue_date
+  const { data: paidInvoices } = await supabase
     .from('documents')
-    .select('total, paid_date')
+    .select('total, paid_date, issue_date')
     .eq('document_type', 'invoice')
     .eq('status', 'paid')
-    .gte('paid_date', startDate.toISOString().split('T')[0])
-    .order('paid_date')
+
+  // Get issued (outstanding) invoices by issue_date
+  const { data: issuedInvoices } = await supabase
+    .from('documents')
+    .select('total, issue_date')
+    .eq('document_type', 'invoice')
+    .eq('status', 'issued')
+    .gte('issue_date', startDateStr)
 
   // Get all approved expenses in the period
   const { data: expenses } = await supabase
     .from('expenses')
     .select('amount, date')
     .eq('status', 'approved')
-    .gte('date', startDate.toISOString().split('T')[0])
+    .gte('date', startDateStr)
     .order('date')
 
   // Group by month
-  const monthlyMap = new Map<string, { revenue: number; expenses: number }>()
+  const monthlyMap = new Map<string, { revenue: number; outstanding: number; expenses: number }>()
 
   // Initialize all months
   for (let i = 0; i < months; i++) {
     const date = new Date(today.getFullYear(), today.getMonth() - months + 1 + i, 1)
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    monthlyMap.set(key, { revenue: 0, expenses: 0 })
+    monthlyMap.set(key, { revenue: 0, outstanding: 0, expenses: 0 })
   }
 
-  // Add revenue
-  invoices?.forEach((inv) => {
-    if (inv.paid_date) {
-      const date = new Date(inv.paid_date)
+  // Add paid revenue (use paid_date, fall back to issue_date)
+  paidInvoices?.forEach((inv) => {
+    const dateStr = inv.paid_date || inv.issue_date
+    if (dateStr) {
+      const date = new Date(dateStr)
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       const existing = monthlyMap.get(key)
       if (existing) {
         existing.revenue += inv.total || 0
+      }
+    }
+  })
+
+  // Add outstanding invoices
+  issuedInvoices?.forEach((inv) => {
+    if (inv.issue_date) {
+      const date = new Date(inv.issue_date)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const existing = monthlyMap.get(key)
+      if (existing) {
+        existing.outstanding += inv.total || 0
       }
     }
   })
@@ -164,6 +185,7 @@ export async function getMonthlyRevenue(months: number = 12): Promise<MonthlyDat
   return Array.from(monthlyMap.entries()).map(([month, data]) => ({
     month,
     revenue: data.revenue,
+    outstanding: data.outstanding,
     expenses: data.expenses,
   }))
 }

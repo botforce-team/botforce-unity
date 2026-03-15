@@ -114,7 +114,7 @@ export function RevolutBalanceCard({ accounts, balances, isConnected }: RevolutB
               ))}
               {accounts.length > 4 && (
                 <Link
-                  href="/finance/accounts"
+                  href="/settings?tab=integrations"
                   className="text-xs text-primary hover:underline"
                 >
                   View all {accounts.length} accounts
@@ -127,10 +127,10 @@ export function RevolutBalanceCard({ accounts, balances, isConnected }: RevolutB
         {/* Link to full view */}
         <div className="pt-2">
           <Link
-            href="/finance/transactions"
+            href="/finance"
             className="text-sm text-primary hover:underline"
           >
-            View transactions →
+            View details →
           </Link>
         </div>
       </CardContent>
