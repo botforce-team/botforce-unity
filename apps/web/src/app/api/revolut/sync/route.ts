@@ -11,8 +11,8 @@ import {
   errorResponse,
   successResponse,
 } from '@/lib/api-utils'
-import { RevolutClient, parseAccount, parseTransaction } from '@/lib/revolut'
-import { decrypt } from '@/lib/revolut/encryption'
+import { RevolutClient, parseAccount, parseTransaction, refreshAccessToken } from '@/lib/revolut'
+import { decrypt, encrypt } from '@/lib/revolut/encryption'
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,10 +70,43 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Decrypt access token
-      const accessToken = decrypt(connection.access_token_encrypted)
+      let accessToken = decrypt(connection.access_token_encrypted)
 
-      // TODO: Check if token needs refresh and refresh if needed
+      // Refresh token if expired or expiring within 5 minutes
+      const expiresAt = new Date(connection.access_token_expires_at)
+      const now = new Date()
+      if (expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
+        const refreshToken = decrypt(connection.refresh_token_encrypted)
+        const clientId = process.env.REVOLUT_CLIENT_ID || ''
+
+        try {
+          const tokens = await refreshAccessToken(refreshToken, clientId)
+          accessToken = tokens.access_token
+
+          // Store new encrypted tokens
+          const newAccessExpiry = new Date(now.getTime() + tokens.expires_in * 1000)
+          const newRefreshExpiry = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
+
+          await adminClient
+            .from('revolut_connections')
+            .update({
+              access_token_encrypted: encrypt(tokens.access_token),
+              refresh_token_encrypted: encrypt(tokens.refresh_token),
+              access_token_expires_at: newAccessExpiry.toISOString(),
+              refresh_token_expires_at: newRefreshExpiry.toISOString(),
+              status: 'active',
+            })
+            .eq('id', connection.id)
+        } catch (refreshError) {
+          // Mark connection as expired if refresh fails
+          await adminClient
+            .from('revolut_connections')
+            .update({ status: 'expired' })
+            .eq('id', connection.id)
+
+          throw new Error('Token expired and refresh failed. Please reconnect Revolut.')
+        }
+      }
 
       // Create API client
       const client = new RevolutClient(accessToken)

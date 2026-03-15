@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
-import { exchangeCodeForTokens } from '@/lib/revolut'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { exchangeCodeForTokens, RevolutClient, parseAccount, parseTransaction } from '@/lib/revolut'
 import { encrypt } from '@/lib/revolut/encryption'
 import { errorResponse } from '@/lib/api-utils'
 
@@ -101,9 +101,83 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(baseRedirectUrl)
     }
 
-    // Success - redirect to settings with success message
-    baseRedirectUrl.searchParams.set('success', 'revolut_connected')
-    return NextResponse.redirect(baseRedirectUrl)
+    // Run initial sync immediately after connection
+    try {
+      const adminClient = await createAdminClient()
+      const client = new RevolutClient(tokens.access_token)
+
+      // Get the connection we just created
+      const { data: newConnection } = await supabase
+        .from('revolut_connections')
+        .select('id')
+        .eq('company_id', companyId)
+        .single()
+
+      // Sync accounts
+      const accounts = await client.getAccounts()
+      for (const account of accounts) {
+        const parsed = parseAccount(account)
+        await adminClient
+          .from('revolut_accounts')
+          .upsert({
+            company_id: companyId,
+            connection_id: newConnection?.id,
+            ...parsed,
+            balance_updated_at: now.toISOString(),
+          }, { onConflict: 'company_id,revolut_account_id' })
+      }
+
+      // Sync transactions (last 30 days)
+      const { data: dbAccounts } = await adminClient
+        .from('revolut_accounts')
+        .select('id, revolut_account_id')
+        .eq('company_id', companyId)
+
+      const accountMap = new Map(
+        dbAccounts?.map((a: any) => [a.revolut_account_id, a.id]) || []
+      )
+
+      const fromDate = new Date()
+      fromDate.setDate(fromDate.getDate() - 30)
+      const transactions = await client.getTransactions({
+        from: fromDate.toISOString(),
+        count: 1000,
+      })
+
+      for (const tx of transactions) {
+        const leg = tx.legs[0]
+        const accountId = accountMap.get(leg?.account_id)
+        if (!accountId) continue
+
+        const parsed = parseTransaction(tx, leg.account_id)
+        await adminClient
+          .from('revolut_transactions')
+          .upsert({
+            company_id: companyId,
+            account_id: accountId,
+            ...parsed,
+          }, { onConflict: 'company_id,revolut_transaction_id' })
+      }
+
+      // Update connection with sync info
+      if (newConnection) {
+        await adminClient
+          .from('revolut_connections')
+          .update({
+            last_sync_at: new Date().toISOString(),
+            last_sync_status: 'completed',
+          })
+          .eq('id', newConnection.id)
+      }
+    } catch (syncError) {
+      // Don't fail the connection if initial sync fails
+      console.error('Initial Revolut sync failed:', syncError)
+    }
+
+    // Success - redirect to finance page to see synced data
+    const financeUrl = new URL('/finance', request.url)
+    financeUrl.searchParams.set('success', 'revolut_connected')
+    return NextResponse.redirect(financeUrl)
 
   } catch (err) {
     console.error('Revolut OAuth callback error:', err)

@@ -22,6 +22,7 @@ import { RevolutBalanceCard } from '@/components/finance/revolut-balance-card'
 import { RevolutTransactions } from '@/components/finance/revolut-transactions'
 import { PaymentActions } from '@/components/finance/payment-actions'
 import { PaymentsList } from '@/components/finance/payments-list'
+import { RevolutSyncButton } from '@/components/finance/revolut-sync-button'
 import { TaxInsightsWidget } from '@/components/finance/tax-insights-widget'
 import { env } from '@/lib/env'
 
@@ -74,10 +75,13 @@ export default async function FinancePage() {
             Overview of your financial performance
           </p>
         </div>
-        <PaymentActions
-          accounts={revolutAccounts.data || []}
-          isConnected={isRevolutConnected}
-        />
+        <div className="flex items-center gap-3">
+          <RevolutSyncButton isConnected={isRevolutConnected} />
+          <PaymentActions
+            accounts={revolutAccounts.data || []}
+            isConnected={isRevolutConnected}
+          />
+        </div>
       </div>
 
       {/* KPI Cards */}
