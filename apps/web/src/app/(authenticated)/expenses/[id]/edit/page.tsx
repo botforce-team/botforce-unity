@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { Breadcrumbs } from '@/components/ui'
 import { ExpenseForm } from '../../expense-form'
-import { getExpense } from '@/app/actions/expenses'
+import { getExpense, getReceiptUrl } from '@/app/actions/expenses'
 import { getProjectsForSelect } from '@/app/actions/time-entries'
 
 export const metadata: Metadata = {
@@ -15,9 +15,10 @@ interface EditExpensePageProps {
 
 export default async function EditExpensePage({ params }: EditExpensePageProps) {
   const { id } = await params
-  const [expense, projects] = await Promise.all([
+  const [expense, projects, receiptUrl] = await Promise.all([
     getExpense(id),
     getProjectsForSelect(),
+    getReceiptUrl(id),
   ])
 
   if (!expense) {
@@ -61,7 +62,7 @@ export default async function EditExpensePage({ params }: EditExpensePageProps) 
       </div>
 
       <div className="max-w-2xl">
-        <ExpenseForm expense={expense} projects={projects} />
+        <ExpenseForm expense={expense} projects={projects} receiptUrl={receiptUrl} />
       </div>
     </div>
   )

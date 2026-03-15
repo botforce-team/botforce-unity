@@ -4,6 +4,7 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Textarea } from '@/components/ui'
 import { createExpense, updateExpense, type CreateExpenseInput } from '@/app/actions/expenses'
+import { ReceiptUpload } from '@/components/expenses/receipt-upload'
 import { expenseCategories, taxRateOptions } from '@/lib/constants'
 import type { Expense, TaxRate, ExpenseCategory } from '@/types'
 
@@ -11,9 +12,10 @@ interface ExpenseFormProps {
   expense?: Expense
   projects: { value: string; label: string }[]
   defaultProjectId?: string
+  receiptUrl?: string | null
 }
 
-export function ExpenseForm({ expense, projects, defaultProjectId }: ExpenseFormProps) {
+export function ExpenseForm({ expense, projects, defaultProjectId, receiptUrl }: ExpenseFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const isEditing = !!expense
@@ -39,7 +41,12 @@ export function ExpenseForm({ expense, projects, defaultProjectId }: ExpenseForm
         : await createExpense(input)
 
       if (result.success) {
-        router.push('/expenses')
+        if (!isEditing && result.data?.id) {
+          // Redirect to edit page so user can upload receipt
+          router.push(`/expenses/${result.data.id}/edit`)
+        } else {
+          router.push('/expenses')
+        }
       } else {
         alert(result.error)
       }
@@ -168,6 +175,21 @@ export function ExpenseForm({ expense, projects, defaultProjectId }: ExpenseForm
             </div>
           </CardContent>
         </Card>
+
+        {/* Receipt Upload - only when editing (expense already exists) */}
+        {expense && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Receipt</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ReceiptUpload
+                expenseId={expense.id}
+                existingReceipt={receiptUrl || null}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex items-center justify-end gap-4">
           <Button
