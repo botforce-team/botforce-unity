@@ -115,11 +115,15 @@ export function getAuthUrl(): string {
  * Generate OAuth authorization URL
  */
 export function generateAuthUrl(state: string): string {
+  const scope = env.REVOLUT_SANDBOX
+    ? 'accounts:read transactions:read payments:write'
+    : 'READ,PAY'
+
   const params = new URLSearchParams({
     client_id: env.REVOLUT_CLIENT_ID || '',
     redirect_uri: env.REVOLUT_REDIRECT_URI,
     response_type: 'code',
-    scope: 'accounts:read transactions:read payments:write',
+    scope,
     state,
   })
 
