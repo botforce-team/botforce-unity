@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { FileText, FileMinus, Pencil, ArrowLeft, Send, CreditCard, Printer } from 'lucide-react'
+import { FileText, FileMinus, Printer } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Breadcrumbs } from '@/components/ui'
 import { getDocument } from '@/app/actions/documents'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -89,14 +89,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
               </Button>
             </a>
           )}
-          {document.status === 'draft' && (
-            <Link href={`/documents/${document.id}/edit`}>
-              <Button variant="outline">
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-            </Link>
-          )}
+          {/* Draft edit page is unbuilt — use the Re-issue flow or recreate via /documents/new. */}
           <DocumentStatusActions document={document} />
         </div>
       </div>
