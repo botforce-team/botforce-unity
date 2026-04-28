@@ -573,9 +573,6 @@ export async function cancelDocument(
   reason?: string
 ): Promise<ActionResult<Document>> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   const { data: existing } = await supabase
     .from('documents')
@@ -613,21 +610,29 @@ export async function cancelDocument(
   // Unlock any time entries linked to this document so they can be edited and
   // re-invoiced. Approved entries are reverted to 'rejected' with a reason —
   // editing them flips them back to 'draft' (see updateTimeEntry).
+  // The `approved -> rejected` transition is gated by the enforce_time_entry_status
+  // trigger; superadmin + non-empty rejection_reason are required.
   const rejectionReason = reason
     ? `Invoice cancelled: ${reason}`
     : 'Invoice cancelled'
 
-  await supabase
+  const { error: unlockError } = await supabase
     .from('time_entries')
     .update({
       document_id: null,
       status: 'rejected',
-      rejected_at: new Date().toISOString(),
-      rejected_by: user?.id ?? null,
       rejection_reason: rejectionReason,
       updated_at: new Date().toISOString(),
     })
     .eq('document_id', id)
+
+  if (unlockError) {
+    console.error('Document cancelled but time entries failed to unlock:', unlockError)
+    return {
+      success: false,
+      error: `Document cancelled, but failed to unlock linked time entries: ${unlockError.message}`,
+    }
+  }
 
   revalidatePath('/documents')
   revalidatePath(`/documents/${id}`)
