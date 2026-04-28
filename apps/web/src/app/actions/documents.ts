@@ -645,6 +645,57 @@ export async function cancelDocument(
 }
 
 /**
+ * Update only the notes / internal_notes on a document.
+ * Permitted on draft, issued, and paid documents — blocked on locked
+ * (already in an accounting export) and on cancelled. Line items,
+ * customer, amounts, and payment terms stay locked once issued.
+ */
+export async function updateDocumentNotes(
+  id: string,
+  input: { notes?: string | null; internal_notes?: string | null }
+): Promise<ActionResult<Document>> {
+  const supabase = await createClient()
+
+  const { data: existing } = await supabase
+    .from('documents')
+    .select('status, is_locked')
+    .eq('id', id)
+    .single()
+
+  if (!existing) {
+    return { success: false, error: 'Document not found' }
+  }
+  if (existing.is_locked) {
+    return { success: false, error: 'Document is locked (already in an accounting export)' }
+  }
+  if (existing.status === 'cancelled') {
+    return { success: false, error: 'Cancelled documents cannot be edited' }
+  }
+
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (input.notes !== undefined) updateData.notes = input.notes
+  if (input.internal_notes !== undefined) updateData.internal_notes = input.internal_notes
+
+  const { data, error } = await supabase
+    .from('documents')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating document notes:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/documents')
+  revalidatePath(`/documents/${id}`)
+  return { success: true, data: data as Document }
+}
+
+/**
  * Re-issue a cancelled invoice as a new draft.
  * Clones customer / project / payment terms / notes, then rebuilds line items
  * from the now-corrected source data:

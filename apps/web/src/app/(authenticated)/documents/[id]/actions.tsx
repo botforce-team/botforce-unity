@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw, Link2, Wrench, Copy } from 'lucide-react'
-import { Button, Input, Label } from '@/components/ui'
+import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw, Link2, Wrench, Copy, FileEdit } from 'lucide-react'
+import { Button, Input, Label, Textarea } from '@/components/ui'
 import {
   issueDocument,
   markDocumentPaid,
@@ -13,6 +13,7 @@ import {
   autoDetectDocumentProject,
   correctExpenseTaxRates,
   reissueFromCancelledInvoice,
+  updateDocumentNotes,
 } from '@/app/actions/documents'
 import { sendInvoiceEmail, sendPaymentReminder } from '@/app/actions/email'
 import type { Document, TaxRate } from '@/types'
@@ -33,6 +34,9 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
   const [fixTaxRate, setFixTaxRate] = useState<TaxRate>('reverse_charge')
   const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0])
   const [paymentReference, setPaymentReference] = useState('')
+  const [showNotesModal, setShowNotesModal] = useState(false)
+  const [notesValue, setNotesValue] = useState(document.notes ?? '')
+  const [internalNotesValue, setInternalNotesValue] = useState(document.internal_notes ?? '')
 
   const handleIssue = () => {
     startTransition(async () => {
@@ -119,6 +123,20 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
     })
   }
 
+  const handleSaveNotes = () => {
+    startTransition(async () => {
+      const result = await updateDocumentNotes(document.id, {
+        notes: notesValue,
+        internal_notes: internalNotesValue,
+      })
+      if (!result.success) {
+        alert(result.error ?? 'Failed to update notes')
+        return
+      }
+      setShowNotesModal(false)
+    })
+  }
+
   const handleReissue = () => {
     startTransition(async () => {
       const result = await reissueFromCancelledInvoice(document.id)
@@ -152,8 +170,9 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
   const canLinkProject = !document.project_id && document.status !== 'cancelled'
   const canFixTaxRates = ['issued', 'draft'].includes(document.status) && !document.is_locked
   const canReissue = document.status === 'cancelled' && document.document_type === 'invoice'
+  const canEditNotes = !document.is_locked && document.status !== 'cancelled'
 
-  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo && !canLinkProject && !canFixTaxRates && !canReissue) {
+  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo && !canLinkProject && !canFixTaxRates && !canReissue && !canEditNotes) {
     return null
   }
 
@@ -200,6 +219,16 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
           <Button variant="outline" onClick={() => setShowFixTaxModal(true)} disabled={isPending}>
             <Wrench className="mr-2 h-4 w-4" />
             Fix Expense VAT
+          </Button>
+        )}
+        {canEditNotes && (
+          <Button variant="outline" onClick={() => {
+            setNotesValue(document.notes ?? '')
+            setInternalNotesValue(document.internal_notes ?? '')
+            setShowNotesModal(true)
+          }} disabled={isPending}>
+            <FileEdit className="mr-2 h-4 w-4" />
+            Edit Notes
           </Button>
         )}
         {canMarkPaid && (
@@ -254,6 +283,52 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
                 </Button>
                 <Button onClick={handleMarkPaid} disabled={isPending}>
                   {isPending ? 'Saving...' : 'Mark as Paid'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Notes Modal */}
+      {showNotesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowNotesModal(false)} />
+          <div className="relative z-10 w-full max-w-lg rounded-lg border border-border bg-background p-6 shadow-xl">
+            <h3 className="text-lg font-medium text-text-primary mb-2">Edit Notes</h3>
+            <p className="text-sm text-text-secondary mb-4">
+              Notes and internal notes can be edited at any time before the document is included in an accounting export. Line items, customer, and amounts stay locked once issued.
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="doc_notes">
+                  Notes <span className="text-text-muted">(visible to the customer on the PDF)</span>
+                </Label>
+                <Textarea
+                  id="doc_notes"
+                  rows={4}
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder="e.g., Replaces invoice INV-2026-0007 (cancelled)."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="doc_internal_notes">
+                  Internal notes <span className="text-text-muted">(only you see these)</span>
+                </Label>
+                <Textarea
+                  id="doc_internal_notes"
+                  rows={3}
+                  value={internalNotesValue}
+                  onChange={(e) => setInternalNotesValue(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setShowNotesModal(false)} disabled={isPending}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveNotes} disabled={isPending}>
+                  {isPending ? 'Saving...' : 'Save Notes'}
                 </Button>
               </div>
             </div>
