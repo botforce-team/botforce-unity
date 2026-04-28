@@ -196,24 +196,6 @@ export const documentSchema = z.object({
 export type DocumentFormData = z.infer<typeof documentSchema>
 
 // ============================================================================
-// Recurring Invoice Schemas
-// ============================================================================
-
-export const recurringInvoiceSchema = z.object({
-  customer_id: uuidSchema,
-  name: z.string().min(1, 'Name is required').max(255),
-  description: z.string().max(5000).optional().nullable(),
-  frequency: z.enum(['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']),
-  day_of_month: z.number().int().min(1).max(31).optional().nullable(),
-  day_of_week: z.number().int().min(0).max(6).optional().nullable(),
-  payment_terms_days: z.number().int().min(0).max(365).default(30),
-  notes: z.string().max(5000).optional().nullable(),
-  lines: z.array(documentLineSchema).min(1, 'At least one line item is required'),
-})
-
-export type RecurringInvoiceFormData = z.infer<typeof recurringInvoiceSchema>
-
-// ============================================================================
 // Settings Schemas
 // ============================================================================
 

@@ -27,7 +27,6 @@ const routeLabels: Record<string, string> = {
   settings: 'Settings',
   new: 'New',
   edit: 'Edit',
-  recurring: 'Recurring',
   'accounting-export': 'Accounting Export',
 }
 

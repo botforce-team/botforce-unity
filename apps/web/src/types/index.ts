@@ -374,50 +374,6 @@ export interface AccountingExport {
 }
 
 // ============================================================================
-// Recurring Invoice Types
-// ============================================================================
-
-export type RecurringFrequency = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
-
-export interface RecurringInvoiceTemplate {
-  id: string
-  company_id: string
-  customer_id: string
-  name: string
-  description: string | null
-  frequency: RecurringFrequency
-  day_of_month: number | null
-  day_of_week: number | null
-  payment_terms_days: number
-  notes: string | null
-  is_active: boolean
-  next_issue_date: string | null
-  last_issued_at: string | null
-  subtotal: number
-  tax_amount: number
-  total: number
-  created_at: string
-  updated_at: string
-  // Joined
-  customer?: Customer
-  lines?: RecurringInvoiceLine[]
-}
-
-export interface RecurringInvoiceLine {
-  id: string
-  template_id: string
-  line_number: number
-  description: string
-  quantity: number
-  unit: string
-  unit_price: number
-  tax_rate: TaxRate
-  project_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-// ============================================================================
 // Audit Log Types
 // ============================================================================
 
