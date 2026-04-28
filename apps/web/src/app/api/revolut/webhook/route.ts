@@ -8,6 +8,14 @@ import { createAdminClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
 import { env } from '@/lib/env'
 
+// Truncate IDs in production logs so full Revolut payment/transaction IDs
+// don't end up in Vercel/host log streams. Dev keeps full IDs for debugging.
+function redactId(id: string | undefined | null): string {
+  if (!id) return '<none>'
+  if (process.env.NODE_ENV !== 'production') return id
+  return id.length > 8 ? `${id.slice(0, 8)}…` : '<short>'
+}
+
 interface WebhookEvent {
   event: string
   timestamp: string
@@ -33,10 +41,10 @@ function verifySignature(payload: string, signature: string, secret: string): bo
     .update(payload)
     .digest('hex')
 
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  )
+  const sigBuf = Buffer.from(signature)
+  const expBuf = Buffer.from(expectedSignature)
+  if (sigBuf.length !== expBuf.length) return false
+  return crypto.timingSafeEqual(sigBuf, expBuf)
 }
 
 export async function POST(request: NextRequest) {
@@ -44,21 +52,29 @@ export async function POST(request: NextRequest) {
     // Get raw body for signature verification
     const rawBody = await request.text()
 
-    // Verify webhook signature if secret is configured
+    // Verify webhook signature. Fail-closed when a secret is configured:
+    // missing/invalid signature → 401. Only skip verification when no
+    // secret is set (dev/local), and warn loudly so it's not silent in prod.
     const signature = request.headers.get('revolut-signature')
     const webhookSecret = env.REVOLUT_WEBHOOK_SECRET
 
-    if (webhookSecret && signature) {
+    if (webhookSecret) {
+      if (!signature) {
+        console.error('Webhook rejected: missing revolut-signature header')
+        return NextResponse.json({ error: 'Missing signature' }, { status: 401 })
+      }
       if (!verifySignature(rawBody, signature, webhookSecret)) {
-        console.error('Invalid webhook signature')
+        console.error('Webhook rejected: invalid signature')
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
+    } else {
+      console.warn('REVOLUT_WEBHOOK_SECRET not set — accepting unsigned webhook')
     }
 
     // Parse the webhook payload
     const event: WebhookEvent = JSON.parse(rawBody)
 
-    console.log('Received Revolut webhook:', event.event, event.data?.id)
+    console.log('Received Revolut webhook:', event.event, redactId(event.data?.id))
 
     const adminClient = await createAdminClient()
 
@@ -112,7 +128,7 @@ async function handleTransactionEvent(
   if (error) {
     console.error('Failed to update transaction:', error)
   } else {
-    console.log(`Transaction ${id} updated to state: ${state}`)
+    console.log(`Transaction ${redactId(id)} updated to state: ${state}`)
   }
 }
 
@@ -160,7 +176,7 @@ async function handlePaymentEvent(
   if (error) {
     console.error('Failed to update payment:', error)
   } else {
-    console.log(`Payment ${id} updated to state: ${state}`)
+    console.log(`Payment ${redactId(id)} updated to state: ${state}`)
 
     // If payment completed, we might want to trigger additional actions
     if (state === 'completed') {
@@ -198,7 +214,7 @@ async function handlePaymentCompleted(
       .eq('id', payment.document_id)
       .eq('company_id', payment.company_id)
 
-    console.log(`Document ${payment.document_id} marked as paid`)
+    console.log(`Document ${redactId(payment.document_id)} marked as paid`)
   }
 
   // Create an audit log entry
@@ -245,7 +261,7 @@ async function handlePaymentFailed(
     })
 
   // TODO: Send notification to payment creator
-  console.log(`Payment ${paymentId} failed with reason: ${reasonCode}`)
+  console.log(`Payment ${redactId(paymentId)} failed with reason: ${reasonCode}`)
 }
 
 // Also support GET for webhook verification (Revolut may ping this)

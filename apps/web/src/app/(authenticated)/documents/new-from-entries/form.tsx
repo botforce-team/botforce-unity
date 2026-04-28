@@ -72,6 +72,7 @@ export function InvoiceFromEntriesForm({
       setTimeEntries(initialTimeEntries)
       setExpenses(initialExpenses)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial* are bootstrap props; only refetch when customerId changes
   }, [customerId])
 
   // Calculate totals

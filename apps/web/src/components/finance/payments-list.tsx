@@ -73,6 +73,7 @@ export function PaymentsList({ initialPayments = [], isConnected }: PaymentsList
     if (isConnected && initialPayments.length === 0) {
       fetchPayments()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch only when connection state flips; initialPayments is the bootstrap value
   }, [isConnected])
 
   if (!isConnected) {

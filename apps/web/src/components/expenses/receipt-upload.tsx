@@ -136,6 +136,7 @@ export function ReceiptUpload({ expenseId, existingReceipt, onUploadComplete }: 
               <span className="text-sm">PDF Receipt</span>
             </div>
           ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- preview is a client-side data/blob URL; next/image cannot optimize it
             <img
               src={preview}
               alt="Receipt preview"

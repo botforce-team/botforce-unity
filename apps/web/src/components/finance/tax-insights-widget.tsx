@@ -48,6 +48,7 @@ export function TaxInsightsWidget({ hasApiKey = false }: TaxInsightsWidgetProps)
     if (hasApiKey) {
       fetchInsights()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch when key becomes available; manual refresh handles re-fetches
   }, [hasApiKey])
 
   // Parse insights into structured items

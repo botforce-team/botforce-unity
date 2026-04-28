@@ -21,11 +21,19 @@ export interface EmailResult {
 }
 
 /**
- * Send an email using the configured email provider
- * Supports Resend, SendGrid, or SMTP via environment variables
+ * Send an email using the configured email provider.
+ * In production, console mode is rejected so emails never silently no-op.
  */
 export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
-  const provider = env.EMAIL_PROVIDER || 'console'
+  const isProd = process.env.NODE_ENV === 'production'
+  const provider = env.EMAIL_PROVIDER || (isProd ? 'resend' : 'console')
+
+  if (isProd && provider === 'console') {
+    console.error(
+      'sendEmail: refusing to use console provider in production. Set EMAIL_PROVIDER=resend and RESEND_API_KEY.'
+    )
+    return { success: false, error: 'Email provider not configured for production' }
+  }
 
   switch (provider) {
     case 'resend':

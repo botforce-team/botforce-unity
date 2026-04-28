@@ -49,6 +49,7 @@ export function ManageTeamDialog({ projectId, projectName, currentTeam }: Manage
     if (isOpen) {
       loadAvailableMembers()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the dialog opens
   }, [isOpen])
 
   const loadAvailableMembers = async () => {

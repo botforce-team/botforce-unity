@@ -49,6 +49,7 @@ export function RevenueReportView({
 
   useEffect(() => {
     loadReport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount; filter changes are applied via the explicit Apply button
   }, [])
 
   const handleExport = () => {
