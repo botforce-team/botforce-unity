@@ -26,6 +26,7 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
   const [isPending, startTransition] = useTransition()
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showFixTaxModal, setShowFixTaxModal] = useState(false)
   const [fixTaxRate, setFixTaxRate] = useState<TaxRate>('reverse_charge')
@@ -53,11 +54,12 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
 
   const handleCancel = () => {
     startTransition(async () => {
-      const result = await cancelDocument(document.id)
+      const result = await cancelDocument(document.id, cancelReason.trim() || undefined)
       if (!result.success) {
         alert(result.error)
       }
       setShowCancelModal(false)
+      setCancelReason('')
     })
   }
 
@@ -245,17 +247,35 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowCancelModal(false)} />
           <div className="relative z-10 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-xl">
-            <h3 className="text-lg font-medium text-text-primary mb-2">Cancel Document</h3>
-            <p className="text-sm text-text-secondary mb-6">
-              Are you sure you want to cancel this {document.document_type === 'invoice' ? 'invoice' : 'credit note'}?
-              This action cannot be undone.
+            <h3 className="text-lg font-medium text-text-primary mb-2">
+              {document.status === 'issued' ? 'Void Issued Invoice' : 'Cancel Document'}
+            </h3>
+            <p className="text-sm text-text-secondary mb-4">
+              {document.status === 'issued'
+                ? `This will mark the ${document.document_type === 'invoice' ? 'invoice' : 'credit note'} as cancelled and unlock all linked time entries (reverted to "rejected" so you can edit hours and re-invoice). The cancellation is recorded in the audit log.`
+                : `Are you sure you want to cancel this ${document.document_type === 'invoice' ? 'invoice' : 'credit note'}? This action cannot be undone.`}
             </p>
+            {document.status === 'issued' && (
+              <div className="space-y-2 mb-4">
+                <Label htmlFor="cancel_reason">Reason (optional)</Label>
+                <Input
+                  id="cancel_reason"
+                  type="text"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g., Client rejected — wrong hours on line 2"
+                />
+                <p className="text-xs text-text-muted">
+                  Saved to each unlocked time entry as the rejection reason.
+                </p>
+              </div>
+            )}
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setShowCancelModal(false)} disabled={isPending}>
+              <Button variant="outline" onClick={() => { setShowCancelModal(false); setCancelReason('') }} disabled={isPending}>
                 Back
               </Button>
               <Button variant="danger" onClick={handleCancel} disabled={isPending}>
-                {isPending ? 'Cancelling...' : 'Cancel Document'}
+                {isPending ? 'Cancelling...' : document.status === 'issued' ? 'Void & Unlock Entries' : 'Cancel Document'}
               </Button>
             </div>
           </div>

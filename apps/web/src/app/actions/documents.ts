@@ -568,8 +568,14 @@ export async function markDocumentPaid(
   return { success: true, data: data as Document }
 }
 
-export async function cancelDocument(id: string): Promise<ActionResult<Document>> {
+export async function cancelDocument(
+  id: string,
+  reason?: string
+): Promise<ActionResult<Document>> {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const { data: existing } = await supabase
     .from('documents')
@@ -582,7 +588,7 @@ export async function cancelDocument(id: string): Promise<ActionResult<Document>
   }
 
   if (existing.is_locked) {
-    return { success: false, error: 'Locked documents cannot be cancelled' }
+    return { success: false, error: 'Locked documents cannot be cancelled (already in an accounting export)' }
   }
 
   if (!['draft', 'issued'].includes(existing.status)) {
@@ -604,8 +610,28 @@ export async function cancelDocument(id: string): Promise<ActionResult<Document>
     return { success: false, error: error.message }
   }
 
+  // Unlock any time entries linked to this document so they can be edited and
+  // re-invoiced. Approved entries are reverted to 'rejected' with a reason —
+  // editing them flips them back to 'draft' (see updateTimeEntry).
+  const rejectionReason = reason
+    ? `Invoice cancelled: ${reason}`
+    : 'Invoice cancelled'
+
+  await supabase
+    .from('time_entries')
+    .update({
+      document_id: null,
+      status: 'rejected',
+      rejected_at: new Date().toISOString(),
+      rejected_by: user?.id ?? null,
+      rejection_reason: rejectionReason,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('document_id', id)
+
   revalidatePath('/documents')
   revalidatePath(`/documents/${id}`)
+  revalidatePath('/timesheets')
   return { success: true, data: data as Document }
 }
 
