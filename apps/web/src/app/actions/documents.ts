@@ -59,6 +59,10 @@ export async function getDocuments(
 
   if (status) {
     query = query.eq('status', status)
+  } else {
+    // Hide cancelled documents from the default list — surface them only when
+    // the user explicitly filters for them.
+    query = query.neq('status', 'cancelled')
   }
 
   if (dateFrom) {
@@ -638,6 +642,202 @@ export async function cancelDocument(
   revalidatePath(`/documents/${id}`)
   revalidatePath('/timesheets')
   return { success: true, data: data as Document }
+}
+
+/**
+ * Re-issue a cancelled invoice as a new draft.
+ * Clones customer / project / payment terms / notes, then rebuilds line items
+ * from the now-corrected source data:
+ *   - Time-entry-backed lines: recalculated from the linked entries' current
+ *     hours and rates (entries must be approved + unlinked).
+ *   - Expense lines and manual lines: copied verbatim.
+ * Re-links time entries to the new draft. Caller lands on the new document
+ * for review and re-issuing.
+ */
+export async function reissueFromCancelledInvoice(
+  sourceDocId: string
+): Promise<ActionResult<Document>> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const adminClient = await createAdminClient()
+  const { data: membership } = await adminClient
+    .from('company_members')
+    .select('company_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+  if (!membership) {
+    return { success: false, error: 'No company membership found' }
+  }
+
+  const { data: source, error: srcErr } = await supabase
+    .from('documents')
+    .select('*, lines:document_lines(*)')
+    .eq('id', sourceDocId)
+    .single()
+
+  if (srcErr || !source) {
+    return { success: false, error: 'Source document not found' }
+  }
+  if (source.status !== 'cancelled') {
+    return { success: false, error: 'Only cancelled documents can be re-issued' }
+  }
+
+  const sourceLines = (source.lines ?? []) as DocumentLine[]
+
+  // Collect every time entry referenced across all lines and validate state
+  const allEntryIds: string[] = []
+  for (const line of sourceLines) {
+    if (line.time_entry_ids && line.time_entry_ids.length > 0) {
+      allEntryIds.push(...line.time_entry_ids)
+    }
+  }
+
+  const entriesById = new Map<string, { id: string; hours: number; hourly_rate: number | null; status: string; document_id: string | null; date: string }>()
+  if (allEntryIds.length > 0) {
+    const { data: entries, error: entriesErr } = await supabase
+      .from('time_entries')
+      .select('id, hours, hourly_rate, status, document_id, date')
+      .in('id', allEntryIds)
+
+    if (entriesErr) {
+      return { success: false, error: entriesErr.message }
+    }
+
+    const blocked = (entries ?? []).filter(
+      (e) => e.status !== 'approved' || e.document_id !== null
+    )
+    if (blocked.length > 0) {
+      const summary = blocked
+        .slice(0, 5)
+        .map((e) =>
+          e.document_id
+            ? `${e.date}: linked to another invoice`
+            : `${e.date}: status "${e.status}" (must be "approved")`
+        )
+        .join('; ')
+      const more = blocked.length > 5 ? ` (+${blocked.length - 5} more)` : ''
+      return {
+        success: false,
+        error: `Cannot re-issue: ${blocked.length} time entries are not ready — ${summary}${more}. Edit the rejected entries, submit, and approve them first.`,
+      }
+    }
+
+    for (const e of entries ?? []) {
+      entriesById.set(e.id, e)
+    }
+  }
+
+  // Recalculate lines from corrected source data
+  let subtotal = 0
+  let totalTax = 0
+  const taxBreakdown: TaxBreakdown = {}
+
+  const recalculatedLines = sourceLines.map((line, idx) => {
+    let lineQuantity = line.quantity
+    let lineUnitPrice = line.unit_price
+    let lineSubtotal = line.subtotal
+
+    if (line.time_entry_ids && line.time_entry_ids.length > 0) {
+      const lineEntries = line.time_entry_ids
+        .map((id) => entriesById.get(id))
+        .filter((e): e is NonNullable<typeof e> => Boolean(e))
+      const hours = lineEntries.reduce((sum, e) => sum + (e.hours || 0), 0)
+      const rate = lineEntries[0]?.hourly_rate ?? line.unit_price
+      lineQuantity = hours
+      lineUnitPrice = rate
+      lineSubtotal = Math.round(hours * rate * 100) / 100
+    }
+
+    const lineTax = calculateTax(lineSubtotal, line.tax_rate)
+    subtotal += lineSubtotal
+    totalTax += lineTax
+    if (lineTax > 0) {
+      taxBreakdown[line.tax_rate] = (taxBreakdown[line.tax_rate] ?? 0) + lineTax
+    }
+
+    return {
+      line_number: idx + 1,
+      description: line.description,
+      quantity: lineQuantity,
+      unit: line.unit,
+      unit_price: lineUnitPrice,
+      tax_rate: line.tax_rate,
+      subtotal: lineSubtotal,
+      tax_amount: lineTax,
+      total: lineSubtotal + lineTax,
+      project_id: line.project_id ?? null,
+      time_entry_ids: line.time_entry_ids ?? null,
+      expense_ids: line.expense_ids ?? null,
+    }
+  })
+
+  const total = subtotal + totalTax
+  const today = new Date().toISOString().split('T')[0]
+  const reissueNote = `[Re-issued from ${source.document_number ?? 'cancelled draft'} on ${today}]`
+  const internalNotes = source.internal_notes
+    ? `${source.internal_notes}\n${reissueNote}`
+    : reissueNote
+
+  const { data: newDoc, error: docErr } = await supabase
+    .from('documents')
+    .insert({
+      company_id: membership.company_id,
+      customer_id: source.customer_id,
+      project_id: source.project_id,
+      document_type: source.document_type,
+      status: 'draft',
+      payment_terms_days: source.payment_terms_days,
+      notes: source.notes,
+      internal_notes: internalNotes,
+      subtotal,
+      tax_amount: totalTax,
+      total,
+      tax_breakdown: taxBreakdown,
+      currency: source.currency,
+    })
+    .select()
+    .single()
+
+  if (docErr || !newDoc) {
+    return { success: false, error: docErr?.message ?? 'Failed to create new draft' }
+  }
+
+  const linesWithDocId = recalculatedLines.map((line) => ({
+    ...line,
+    document_id: newDoc.id,
+  }))
+
+  const { error: linesErr } = await supabase
+    .from('document_lines')
+    .insert(linesWithDocId)
+
+  if (linesErr) {
+    await supabase.from('documents').delete().eq('id', newDoc.id)
+    return { success: false, error: linesErr.message }
+  }
+
+  // Re-link time entries to the new draft
+  if (allEntryIds.length > 0) {
+    const { error: linkErr } = await supabase
+      .from('time_entries')
+      .update({ document_id: newDoc.id, updated_at: new Date().toISOString() })
+      .in('id', allEntryIds)
+
+    if (linkErr) {
+      await supabase.from('document_lines').delete().eq('document_id', newDoc.id)
+      await supabase.from('documents').delete().eq('id', newDoc.id)
+      return { success: false, error: `Failed to re-link time entries: ${linkErr.message}` }
+    }
+  }
+
+  revalidatePath('/documents')
+  revalidatePath('/timesheets')
+  return { success: true, data: newDoc as Document }
 }
 
 /**

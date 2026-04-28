@@ -135,6 +135,16 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
               >
                 Paid
               </Link>
+              <Link
+                href={params.type ? `/documents?type=${params.type}&status=cancelled` : '/documents?status=cancelled'}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  params.status === 'cancelled'
+                    ? 'bg-danger/10 text-danger ring-1 ring-danger/30'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+                }`}
+              >
+                Cancelled
+              </Link>
             </div>
           </div>
         </CardContent>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw, Link2, Wrench } from 'lucide-react'
+import { Send, CreditCard, Ban, Trash2, Mail, Bell, RefreshCw, Link2, Wrench, Copy } from 'lucide-react'
 import { Button, Input, Label } from '@/components/ui'
 import {
   issueDocument,
@@ -12,6 +12,7 @@ import {
   refreshDocumentCompanySnapshot,
   autoDetectDocumentProject,
   correctExpenseTaxRates,
+  reissueFromCancelledInvoice,
 } from '@/app/actions/documents'
 import { sendInvoiceEmail, sendPaymentReminder } from '@/app/actions/email'
 import type { Document, TaxRate } from '@/types'
@@ -118,6 +119,17 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
     })
   }
 
+  const handleReissue = () => {
+    startTransition(async () => {
+      const result = await reissueFromCancelledInvoice(document.id)
+      if (result.success && result.data) {
+        router.push(`/documents/${result.data.id}`)
+      } else {
+        alert(result.error ?? 'Failed to re-issue')
+      }
+    })
+  }
+
   const handleFixExpenseTaxRates = () => {
     startTransition(async () => {
       const result = await correctExpenseTaxRates(document.id, fixTaxRate)
@@ -139,8 +151,9 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
   const canRefreshCompanyInfo = document.status !== 'cancelled'
   const canLinkProject = !document.project_id && document.status !== 'cancelled'
   const canFixTaxRates = ['issued', 'draft'].includes(document.status) && !document.is_locked
+  const canReissue = document.status === 'cancelled' && document.document_type === 'invoice'
 
-  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo && !canLinkProject && !canFixTaxRates) {
+  if (!canIssue && !canMarkPaid && !canCancel && !canDelete && !canSendEmail && !canSendReminder && !canRefreshCompanyInfo && !canLinkProject && !canFixTaxRates && !canReissue) {
     return null
   }
 
@@ -151,6 +164,12 @@ export function DocumentStatusActions({ document }: DocumentStatusActionsProps) 
           <Button onClick={handleIssue} disabled={isPending}>
             <Send className="mr-2 h-4 w-4" />
             {isPending ? 'Issuing...' : 'Issue'}
+          </Button>
+        )}
+        {canReissue && (
+          <Button onClick={handleReissue} disabled={isPending}>
+            <Copy className="mr-2 h-4 w-4" />
+            {isPending ? 'Re-issuing...' : 'Re-issue as draft'}
           </Button>
         )}
         {canSendEmail && (
