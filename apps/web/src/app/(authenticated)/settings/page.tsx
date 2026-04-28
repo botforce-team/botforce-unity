@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { Activity } from 'lucide-react'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { getCompanyInfo, getUserProfile } from '@/app/actions/settings'
@@ -61,6 +63,15 @@ export default async function SettingsPage({
             Manage your account and company settings
           </p>
         </div>
+        {isSuperAdmin && (
+          <Link
+            href="/settings/tests"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-text-primary hover:bg-surface-hover"
+          >
+            <Activity className="h-4 w-4" />
+            Smoke tests
+          </Link>
+        )}
       </div>
 
       {/* URL-based notifications */}
